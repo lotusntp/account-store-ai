@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Properties from application.yml -->
+    <springProperty scope="context" name="appName" source="spring.application.name"/>
+    <springProperty scope="context" name="env" source="spring.profiles.active" defaultValue="default"/>
+    <springProperty scope="context" name="elasticsearchHost" source="logging.elasticsearch.host" defaultValue="192.168.100.11"/>
+    <springProperty scope="context" name="elasticsearchPort" source="logging.elasticsearch.port" defaultValue="5000"/>
+
+    <!-- Common pattern for all appenders -->
+    <property name="CONSOLE_LOG_PATTERN" 
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{traceId:-},%X{spanId:-}]){yellow} %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"/>
+
+    <!-- Console Appender with ECS format -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="co.elastic.logging.logback.EcsEncoder">
+            <serviceName>${appName}</serviceName>
+            <serviceEnvironment>${env}</serviceEnvironment>
+            <includeMarkers>true</includeMarkers>
+            <includeMdc>true</includeMdc>
+        </encoder>
+    </appender>
+
+    <!-- JSON Appender for Elasticsearch -->
+    <appender name="ELASTIC" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${elasticsearchHost}:${elasticsearchPort}</destination>
+        <reconnectionDelay>5 seconds</reconnectionDelay>
+        <connectionTimeout>10 seconds</connectionTimeout>
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"application":"${appName}","environment":"${env}"}</customFields>
+            <fieldNames>
+                <timestamp>timestamp</timestamp>
+                <message>message</message>
+                <logger>logger_name</logger>
+                <thread>thread_name</thread>
+                <level>level</level>
+                <levelValue>[ignore]</levelValue>
+            </fieldNames>
+            <timeZone>UTC</timeZone>
+            <includeMdc>true</includeMdc>
+            <includeContext>true</includeContext>
+            <includeTags>true</includeTags>
+            <includeStructuredArguments>true</includeStructuredArguments>
+            <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                <maxLength>4096</maxLength>
+                <shortenedClassNameLength>36</shortenedClassNameLength>
+                <rootCauseFirst>true</rootCauseFirst>
+            </throwableConverter>
+        </encoder>
+    </appender>
+
+    <!-- Async appender for better performance -->
+    <appender name="ASYNC_ELASTIC" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="ELASTIC" />
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>true</includeCallerData>
+        <includeMdc>true</includeMdc>
+    </appender>
+
+    <!-- Application specific loggers -->
+    <logger name="com.accountselling.platform" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="ASYNC_ELASTIC" />
+    </logger>
+
+    <!-- Spring Framework loggers -->
+    <logger name="org.springframework" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="ASYNC_ELASTIC" />
+    </logger>
+
+    <!-- Security related loggers -->
+    <logger name="org.springframework.security" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="ASYNC_ELASTIC" />
+    </logger>
+
+    <!-- Database related loggers -->
+    <logger name="org.hibernate" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="ASYNC_ELASTIC" />
+    </logger>
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="ASYNC_ELASTIC" />
+    </root>
+
+</configuration>

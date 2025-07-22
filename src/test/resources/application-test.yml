@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: account-selling-platform-test
+
+  datasource:
+    datasource:
+      url: jdbc:postgresql://localhost:5432/accountselling
+      username: postgres
+      password: postgres
+      driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+management:
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
+
+logging:
+  level:
+    root: INFO
+    com.accountselling.platform: DEBUG
+    org.springframework: INFO
+  elasticsearch:
+    host: localhost
+    port: 5000
+
+otel:
+  sdk:
+    disabled: false
+  traces:
+    exporter: none
+  logs:
+    exporter: none
