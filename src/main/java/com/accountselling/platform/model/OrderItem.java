@@ -1,5 +1,6 @@
 package com.accountselling.platform.model;
 
+import com.accountselling.platform.enums.OrderStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -126,7 +127,7 @@ public class OrderItem extends BaseEntity {
     }
 
     // Get order status for convenience
-    public Order.OrderStatus getOrderStatus() {
+    public OrderStatus getOrderStatus() {
         return order != null ? order.getStatus() : null;
     }
 

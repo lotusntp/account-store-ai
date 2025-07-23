@@ -1,5 +1,6 @@
 package com.accountselling.platform.model;
 
+import com.accountselling.platform.enums.PaymentStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -110,27 +111,27 @@ public class Payment extends BaseEntity {
 
     // Business logic methods
     public boolean isPending() {
-        return status == PaymentStatus.PENDING;
+        return status != null && status.isPending();
     }
 
     public boolean isCompleted() {
-        return status == PaymentStatus.COMPLETED;
+        return status != null && status.isCompleted();
     }
 
     public boolean isFailed() {
-        return status == PaymentStatus.FAILED;
+        return status != null && status.isFailed();
     }
 
     public boolean isCancelled() {
-        return status == PaymentStatus.CANCELLED;
+        return status != null && status.isCancelled();
     }
 
     public boolean isProcessing() {
-        return status == PaymentStatus.PROCESSING;
+        return status != null && status.isProcessing();
     }
 
     public boolean isRefunded() {
-        return status == PaymentStatus.REFUNDED;
+        return status != null && status.isRefunded();
     }
 
     public boolean isExpired() {
@@ -139,15 +140,15 @@ public class Payment extends BaseEntity {
 
     // Status transition methods
     public void markAsProcessing() {
-        if (!isPending()) {
-            throw new IllegalStateException("Can only mark pending payments as processing");
+        if (status == null || !status.canTransitionTo(PaymentStatus.PROCESSING)) {
+            throw new IllegalStateException("Cannot transition from " + status + " to PROCESSING");
         }
         this.status = PaymentStatus.PROCESSING;
     }
 
     public void markAsCompleted(String transactionId) {
-        if (!isPending() && !isProcessing()) {
-            throw new IllegalStateException("Can only mark pending or processing payments as completed");
+        if (status == null || !status.canTransitionTo(PaymentStatus.COMPLETED)) {
+            throw new IllegalStateException("Cannot transition from " + status + " to COMPLETED");
         }
         this.status = PaymentStatus.COMPLETED;
         this.transactionId = transactionId;
@@ -155,23 +156,23 @@ public class Payment extends BaseEntity {
     }
 
     public void markAsFailed(String reason) {
-        if (isCompleted() || isRefunded()) {
-            throw new IllegalStateException("Cannot mark completed or refunded payments as failed");
+        if (status == null || !status.canTransitionTo(PaymentStatus.FAILED)) {
+            throw new IllegalStateException("Cannot transition from " + status + " to FAILED");
         }
         this.status = PaymentStatus.FAILED;
         this.failureReason = reason;
     }
 
     public void markAsCancelled() {
-        if (isCompleted() || isRefunded()) {
-            throw new IllegalStateException("Cannot cancel completed or refunded payments");
+        if (status == null || !status.canTransitionTo(PaymentStatus.CANCELLED)) {
+            throw new IllegalStateException("Cannot transition from " + status + " to CANCELLED");
         }
         this.status = PaymentStatus.CANCELLED;
     }
 
     public void markAsRefunded(BigDecimal refundAmount) {
-        if (!isCompleted()) {
-            throw new IllegalStateException("Can only refund completed payments");
+        if (status == null || !status.canTransitionTo(PaymentStatus.REFUNDED)) {
+            throw new IllegalStateException("Cannot transition from " + status + " to REFUNDED");
         }
         this.status = PaymentStatus.REFUNDED;
         this.refundAmount = refundAmount;
@@ -236,12 +237,13 @@ public class Payment extends BaseEntity {
 
     // Check if payment can be cancelled
     public boolean canBeCancelled() {
-        return isPending() || isProcessing();
+        return status != null && status.canBeCancelled();
     }
 
     // Check if payment can be refunded
     public boolean canBeRefunded() {
-        return isCompleted() && (refundAmount == null || refundAmount.compareTo(amount) < 0);
+        return status != null && status.canBeRefunded() && 
+               (refundAmount == null || refundAmount.compareTo(amount) < 0);
     }
 
     // Get remaining time until expiration in minutes
@@ -280,31 +282,5 @@ public class Payment extends BaseEntity {
                amount.compareTo(order.getTotalAmount()) == 0;
     }
 
-    /**
-     * Payment status enumeration
-     */
-    public enum PaymentStatus {
-        PENDING("Pending", "รอชำระเงิน"),
-        PROCESSING("Processing", "กำลังดำเนินการ"),
-        COMPLETED("Completed", "ชำระเงินสำเร็จ"),
-        FAILED("Failed", "ชำระเงินล้มเหลว"),
-        CANCELLED("Cancelled", "ยกเลิกการชำระเงิน"),
-        REFUNDED("Refunded", "คืนเงินแล้ว");
 
-        private final String displayName;
-        private final String displayNameTh;
-
-        PaymentStatus(String displayName, String displayNameTh) {
-            this.displayName = displayName;
-            this.displayNameTh = displayNameTh;
-        }
-
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public String getDisplayNameTh() {
-            return displayNameTh;
-        }
-    }
 }

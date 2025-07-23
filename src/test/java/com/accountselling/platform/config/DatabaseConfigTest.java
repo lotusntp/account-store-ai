@@ -28,7 +28,7 @@ class DatabaseConfigTest {
         assertNotNull(jdbcTemplate);
 
         // Test that we can execute a query
-        String dbVersion = jdbcTemplate.queryForObject("SELECT version()", String.class);
+        String dbVersion = jdbcTemplate.queryForObject("SELECT H2VERSION() FROM DUAL", String.class);
         assertNotNull(dbVersion);
         System.out.println("Database version: " + dbVersion);
     }

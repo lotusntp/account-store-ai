@@ -42,10 +42,12 @@ spring:
 server:
   port: 8080
 
-jwt:
-  secret: your_jwt_secret_key_here_make_it_at_least_32_characters_long
-  expiration: 86400000
-  refresh-expiration: 604800000
+# JWT Configuration
+app:
+  jwt:
+    secret: dGhpc19pc19hX3NlY3VyZV9zZWNyZXRfa2V5X2Zvcl9qd3RfdG9rZW5zX3RoYXRfaXNfbG9uZ19lbm91Z2g=
+    access-token-expiration: 900000    # 15 minutes
+    refresh-token-expiration: 604800000 # 7 days
 
 
 logging:

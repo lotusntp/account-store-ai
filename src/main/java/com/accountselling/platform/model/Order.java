@@ -1,5 +1,6 @@
 package com.accountselling.platform.model;
 
+import com.accountselling.platform.enums.OrderStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -114,50 +115,50 @@ public class Order extends BaseEntity {
     }
 
     public boolean isPending() {
-        return status == OrderStatus.PENDING;
+        return status != null && status.isPending();
     }
 
     public boolean isCompleted() {
-        return status == OrderStatus.COMPLETED;
+        return status != null && status.isCompleted();
     }
 
     public boolean isFailed() {
-        return status == OrderStatus.FAILED;
+        return status != null && status.isFailed();
     }
 
     public boolean isCancelled() {
-        return status == OrderStatus.CANCELLED;
+        return status != null && status.isCancelled();
     }
 
     public boolean isProcessing() {
-        return status == OrderStatus.PROCESSING;
+        return status != null && status.isProcessing();
     }
 
     // Status transition methods
     public void markAsProcessing() {
-        if (!isPending()) {
-            throw new IllegalStateException("Can only mark pending orders as processing");
+        if (status == null || !status.canTransitionTo(OrderStatus.PROCESSING)) {
+            throw new IllegalStateException("Cannot transition from " + status + " to PROCESSING");
         }
         this.status = OrderStatus.PROCESSING;
     }
 
     public void markAsCompleted() {
-        if (!isProcessing() && !isPending()) {
-            throw new IllegalStateException("Can only mark pending or processing orders as completed");
+        if (status == null || !status.canTransitionTo(OrderStatus.COMPLETED)) {
+            throw new IllegalStateException("Cannot transition from " + status + " to COMPLETED");
         }
         this.status = OrderStatus.COMPLETED;
     }
 
     public void markAsFailed() {
-        if (isCompleted()) {
-            throw new IllegalStateException("Cannot mark completed orders as failed");
+        if (status == null || !status.canTransitionTo(OrderStatus.FAILED)) {
+            throw new IllegalStateException("Cannot transition from " + status + " to FAILED");
         }
         this.status = OrderStatus.FAILED;
     }
 
     public void markAsCancelled() {
-        if (isCompleted()) {
-            throw new IllegalStateException("Cannot cancel completed orders");
+        if (status == null || !status.canTransitionTo(OrderStatus.CANCELLED)) {
+            throw new IllegalStateException("Cannot transition from " + status + " to CANCELLED");
         }
         this.status = OrderStatus.CANCELLED;
     }
@@ -207,38 +208,11 @@ public class Order extends BaseEntity {
 
     // Check if order can be cancelled
     public boolean canBeCancelled() {
-        return isPending() || isProcessing();
+        return status != null && status.canBeCancelled();
     }
 
     // Check if order can be refunded
     public boolean canBeRefunded() {
-        return isCompleted();
-    }
-
-    /**
-     * Order status enumeration
-     */
-    public enum OrderStatus {
-        PENDING("Pending", "รอดำเนินการ"),
-        PROCESSING("Processing", "กำลังดำเนินการ"),
-        COMPLETED("Completed", "เสร็จสิ้น"),
-        FAILED("Failed", "ล้มเหลว"),
-        CANCELLED("Cancelled", "ยกเลิก");
-
-        private final String displayName;
-        private final String displayNameTh;
-
-        OrderStatus(String displayName, String displayNameTh) {
-            this.displayName = displayName;
-            this.displayNameTh = displayNameTh;
-        }
-
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public String getDisplayNameTh() {
-            return displayNameTh;
-        }
+        return status != null && status.canBeRefunded();
     }
 }

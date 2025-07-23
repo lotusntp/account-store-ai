@@ -1,5 +1,7 @@
 package com.accountselling.platform.model;
 
+import com.accountselling.platform.enums.OrderStatus;
+import com.accountselling.platform.enums.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -57,7 +59,7 @@ class OrderDomainModelTest {
         assertNotNull(testOrder);
         assertEquals(testUser, testOrder.getUser());
         assertEquals(new BigDecimal("100.00"), testOrder.getTotalAmount());
-        assertEquals(Order.OrderStatus.PENDING, testOrder.getStatus());
+        assertEquals(OrderStatus.PENDING, testOrder.getStatus());
         assertNotNull(testOrder.getOrderNumber());
         assertTrue(testOrder.getOrderNumber().startsWith("ORD-"));
     }
@@ -146,7 +148,7 @@ class OrderDomainModelTest {
         assertNotNull(testPayment);
         assertEquals(testOrder, testPayment.getOrder());
         assertEquals(new BigDecimal("100.00"), testPayment.getAmount());
-        assertEquals(Payment.PaymentStatus.PENDING, testPayment.getStatus());
+        assertEquals(PaymentStatus.PENDING, testPayment.getStatus());
         assertEquals("QR_CODE", testPayment.getPaymentMethod());
         assertNotNull(testPayment.getPaymentReference());
         assertTrue(testPayment.getPaymentReference().startsWith("PAY-"));
