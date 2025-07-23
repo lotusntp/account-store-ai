@@ -11,7 +11,7 @@ public class NoJpaAuditingConfig {
 
     @Bean
     public AuditorAware<String> auditorAware() {
-        // mock หรือ placeholder
+        // mock or placeholder
         return () -> Optional.of("test-user");
     }
 }

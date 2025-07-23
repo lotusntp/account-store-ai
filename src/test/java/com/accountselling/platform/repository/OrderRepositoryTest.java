@@ -26,8 +26,8 @@ import static org.assertj.core.api.Assertions.*;
  * Tests all order management operations including order tracking,
  * status management, user orders, and reporting functionality.
  * 
- * การทดสอบ OrderRepository ครอบคลุมการจัดการคำสั่งซื้อ
- * การติดตามสถานะ คำสั่งซื้อของผู้ใช้ และการรายงาน
+ * OrderRepository testing covering order management
+ * status tracking, user orders, and reporting
  */
 @DataJpaTest
 @ActiveProfiles("test")

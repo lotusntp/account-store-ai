@@ -21,8 +21,8 @@ import static org.mockito.Mockito.*;
  * Unit tests for CategoryServiceImpl.
  * Tests category management functionality including hierarchy operations, search, and validation.
  * 
- * การทดสอบ CategoryServiceImpl
- * ทดสอบฟังก์ชันการจัดการหมวดหมู่รวมถึงการจัดการลำดับชั้น การค้นหา และการตรวจสอบ
+ * CategoryServiceImpl testing
+ * Tests category management functions including hierarchy management, search, and validation
  */
 @ExtendWith(MockitoExtension.class)
 class CategoryServiceImplTest {

@@ -32,9 +32,9 @@ import static org.mockito.Mockito.*;
  * Tests comprehensive stock management operations including reservations,
  * sales tracking, and inventory management with mock dependencies.
  * 
- * การทดสอบ unit สำหรับ StockServiceImpl
- * ทดสอบการจัดการสต็อกครบครัน รวมถึงการจอง การติดตามการขาย 
- * และการจัดการสต็อกด้วย mock dependencies
+ * Unit testing for StockServiceImpl
+ * Tests comprehensive stock management including reservations, sales tracking
+ * and inventory management with mock dependencies
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StockService Implementation Tests")
@@ -57,7 +57,7 @@ class StockServiceImplTest {
     
     @BeforeEach
     void setUp() {
-        // สร้างข้อมูลทดสอบ - Setup test data
+        // Setup test data
         productId = UUID.randomUUID();
         stockId = UUID.randomUUID();
         
@@ -79,9 +79,9 @@ class StockServiceImplTest {
     // ==================== CREATE STOCK TESTS ====================
     
     @Test
-    @DisplayName("ควรสร้างสต็อกใหม่ได้สำเร็จ - Should create new stock successfully")
+    @DisplayName("Should create new stock successfully")
     void shouldCreateStockSuccessfully() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         String credentials = "test_credentials";
         String additionalInfo = "test_additional_info";
         
@@ -89,10 +89,10 @@ class StockServiceImplTest {
         when(stockRepository.existsByProductIdAndCredentials(productId, credentials)).thenReturn(false);
         when(stockRepository.save(any(Stock.class))).thenReturn(testStock);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         Stock result = stockService.createStock(productId, credentials, additionalInfo);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(stockId);
         assertThat(result.getCredentials()).isEqualTo("encrypted_credentials_123");
@@ -103,14 +103,14 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรโยน ResourceNotFoundException เมื่อไม่พบสินค้า - Should throw ResourceNotFoundException when product not found")
+    @DisplayName("Should throw ResourceNotFoundException when product not found")
     void shouldThrowExceptionWhenProductNotFound() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         String credentials = "test_credentials";
         
         when(productRepository.findById(productId)).thenReturn(Optional.empty());
         
-        // When & Then - เรียกใช้และตรวจสอบ exception
+        // When & Then - Execute and verify exception
         assertThatThrownBy(() -> stockService.createStock(productId, credentials, null))
             .isInstanceOf(ResourceNotFoundException.class)
             .hasMessageContaining("Product not found with ID: " + productId);
@@ -120,15 +120,15 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรโยน ResourceAlreadyExistsException เมื่อ credentials ซ้ำ - Should throw ResourceAlreadyExistsException when credentials duplicate")
+    @DisplayName("Should throw ResourceAlreadyExistsException when credentials duplicate")
     void shouldThrowExceptionWhenCredentialsDuplicate() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         String credentials = "duplicate_credentials";
         
         when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
         when(stockRepository.existsByProductIdAndCredentials(productId, credentials)).thenReturn(true);
         
-        // When & Then - เรียกใช้และตรวจสอบ exception
+        // When & Then - Execute and verify exception
         assertThatThrownBy(() -> stockService.createStock(productId, credentials, null))
             .isInstanceOf(ResourceAlreadyExistsException.class)
             .hasMessageContaining("Credentials already exist for this product");
@@ -139,9 +139,9 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรสร้างสต็อกจำนวนมากได้สำเร็จ - Should create bulk stock successfully")
+    @DisplayName("Should create bulk stock successfully")
     void shouldCreateBulkStockSuccessfully() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         List<String> credentialsList = Arrays.asList("cred1", "cred2", "cred3");
         List<Stock> expectedStocks = Arrays.asList(
             new Stock(testProduct, "cred1"),
@@ -153,10 +153,10 @@ class StockServiceImplTest {
         when(stockRepository.existsByProductIdAndCredentials(eq(productId), anyString())).thenReturn(false);
         when(stockRepository.saveAll(anyList())).thenReturn(expectedStocks);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         List<Stock> result = stockService.createBulkStock(productId, credentialsList);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).hasSize(3);
         assertThat(result).extracting(Stock::getCredentials).containsExactly("cred1", "cred2", "cred3");
         
@@ -168,62 +168,62 @@ class StockServiceImplTest {
     // ==================== STOCK AVAILABILITY TESTS ====================
     
     @Test
-    @DisplayName("ควรคืนจำนวนสต็อกที่มีจำหน่ายได้ถูกต้อง - Should return correct available stock count")
+    @DisplayName("Should return correct available stock count")
     void shouldReturnCorrectAvailableStockCount() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         long expectedCount = 10L;
         
         when(stockRepository.countAvailableByProductId(productId)).thenReturn(expectedCount);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         long result = stockService.getAvailableStockCount(productId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isEqualTo(expectedCount);
         
         verify(stockRepository).countAvailableByProductId(productId);
     }
     
     @Test
-    @DisplayName("ควรคืน true เมื่อมีสต็อก - Should return true when in stock")
+    @DisplayName("Should return true when in stock")
     void shouldReturnTrueWhenInStock() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         when(stockRepository.countAvailableByProductId(productId)).thenReturn(5L);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         boolean result = stockService.isInStock(productId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isTrue();
         
         verify(stockRepository).countAvailableByProductId(productId);
     }
     
     @Test
-    @DisplayName("ควรคืน false เมื่อหมดสต็อก - Should return false when out of stock")
+    @DisplayName("Should return false when out of stock")
     void shouldReturnFalseWhenOutOfStock() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         when(stockRepository.countAvailableByProductId(productId)).thenReturn(0L);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         boolean result = stockService.isInStock(productId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isFalse();
         
         verify(stockRepository).countAvailableByProductId(productId);
     }
     
     @Test
-    @DisplayName("ควรดึงสต็อกรายการแรกที่มีจำหน่ายได้ - Should get first available stock")
+    @DisplayName("Should get first available stock")
     void shouldGetFirstAvailableStock() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         when(stockRepository.findFirstAvailableByProductId(productId)).thenReturn(Optional.of(testStock));
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         Optional<Stock> result = stockService.getFirstAvailableStock(productId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isPresent();
         assertThat(result.get()).isEqualTo(testStock);
         
@@ -233,9 +233,9 @@ class StockServiceImplTest {
     // ==================== STOCK RESERVATION TESTS ====================
     
     @Test
-    @DisplayName("ควรจองสต็อกได้สำเร็จ - Should reserve stock successfully")
+    @DisplayName("Should reserve stock successfully")
     void shouldReserveStockSuccessfully() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         int quantity = 2;
         int reservationMinutes = 15;
         List<Stock> availableStocks = Arrays.asList(
@@ -249,10 +249,10 @@ class StockServiceImplTest {
         when(stockRepository.findAvailableStockByProductId(productId)).thenReturn(availableStocks);
         when(stockRepository.save(any(Stock.class))).thenAnswer(invocation -> invocation.getArgument(0));
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         List<Stock> result = stockService.reserveStock(productId, quantity, reservationMinutes);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).hasSize(quantity);
         assertThat(result).allMatch(stock -> stock.getReservedUntil() != null);
         
@@ -263,21 +263,21 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรโยน OutOfStockException เมื่อสต็อกไม่เพียงพอ - Should throw OutOfStockException when insufficient stock")
+    @DisplayName("Should throw OutOfStockException when insufficient stock")
     void shouldThrowOutOfStockExceptionWhenInsufficientStock() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         int quantity = 5;
         int reservationMinutes = 15;
         List<Stock> availableStocks = Arrays.asList(
             new Stock(testProduct, "cred1"),
             new Stock(testProduct, "cred2")
-        ); // มีเพียง 2 รายการ แต่ต้องการ 5 รายการ
+        ); // Only 2 items available but 5 requested
         
         when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
         when(stockRepository.clearExpiredReservations()).thenReturn(0);
         when(stockRepository.findAvailableStockByProductId(productId)).thenReturn(availableStocks);
         
-        // When & Then - เรียกใช้และตรวจสอบ exception
+        // When & Then - Execute and verify exception
         assertThatThrownBy(() -> stockService.reserveStock(productId, quantity, reservationMinutes))
             .isInstanceOf(OutOfStockException.class)
             .hasMessageContaining("Insufficient stock available. Required: 5, Available: 2");
@@ -289,18 +289,18 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรยกเลิกการจองได้สำเร็จ - Should release reservation successfully")
+    @DisplayName("Should release reservation successfully")
     void shouldReleaseReservationSuccessfully() {
-        // Given - เตรียมข้อมูล
-        testStock.reserve(15); // จองสต็อกไว้ก่อน
+        // Given - Prepare data
+        testStock.reserve(15); // Reserve stock first
         
         when(stockRepository.findById(stockId)).thenReturn(Optional.of(testStock));
         when(stockRepository.save(testStock)).thenReturn(testStock);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         boolean result = stockService.releaseReservation(stockId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isTrue();
         assertThat(testStock.getReservedUntil()).isNull();
         
@@ -309,15 +309,15 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรคืน false เมื่อยกเลิกการจองที่ไม่ได้จองอยู่ - Should return false when releasing non-reserved stock")
+    @DisplayName("Should return false when releasing non-reserved stock")
     void shouldReturnFalseWhenReleasingNonReservedStock() {
-        // Given - เตรียมข้อมูล (สต็อกที่ไม่ได้จอง)
+        // Given - Prepare data (stock that is not reserved)
         when(stockRepository.findById(stockId)).thenReturn(Optional.of(testStock));
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         boolean result = stockService.releaseReservation(stockId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isFalse();
         
         verify(stockRepository).findById(stockId);
@@ -327,16 +327,16 @@ class StockServiceImplTest {
     // ==================== STOCK SALES TESTS ====================
     
     @Test
-    @DisplayName("ควรทำเครื่องหมายขายแล้วได้สำเร็จ - Should mark as sold successfully")
+    @DisplayName("Should mark as sold successfully")
     void shouldMarkAsSoldSuccessfully() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         when(stockRepository.findById(stockId)).thenReturn(Optional.of(testStock));
         when(stockRepository.save(testStock)).thenReturn(testStock);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         Stock result = stockService.markAsSold(stockId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isNotNull();
         assertThat(result.getSold()).isTrue();
         assertThat(result.getSoldAt()).isNotNull();
@@ -346,14 +346,14 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรโยน StockException เมื่อทำเครื่องหมายขายแล้วซ้ำ - Should throw StockException when marking already sold stock")
+    @DisplayName("Should throw StockException when marking already sold stock")
     void shouldThrowExceptionWhenMarkingAlreadySoldStock() {
-        // Given - เตรียมข้อมูล (สต็อกที่ขายแล้ว)
+        // Given - Prepare data (stock that is already sold)
         testStock.markAsSold();
         
         when(stockRepository.findById(stockId)).thenReturn(Optional.of(testStock));
         
-        // When & Then - เรียกใช้และตรวจสอบ exception
+        // When & Then - Execute and verify exception
         assertThatThrownBy(() -> stockService.markAsSold(stockId))
             .isInstanceOf(StockException.class)
             .hasMessageContaining("Cannot mark stock as sold");
@@ -365,17 +365,17 @@ class StockServiceImplTest {
     // ==================== INVENTORY MANAGEMENT TESTS ====================
     
     @Test
-    @DisplayName("ควรคืนสถิติสต็อกที่ถูกต้อง - Should return correct stock statistics")
+    @DisplayName("Should return correct stock statistics")
     void shouldReturnCorrectStockStatistics() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         Object[] mockStats = {10L, 7L, 2L, 1L}; // total, available, sold, reserved
         
         when(stockRepository.getStockStatisticsByProductId(productId)).thenReturn(mockStats);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         StockService.StockStatistics result = stockService.getStockStatistics(productId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result.total()).isEqualTo(10L);
         assertThat(result.available()).isEqualTo(7L);
         assertThat(result.sold()).isEqualTo(2L);
@@ -385,17 +385,17 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรตรวจสอบสินค้าสต็อกต่ำได้ถูกต้อง - Should correctly identify low stock products")
+    @DisplayName("Should correctly identify low stock products")
     void shouldCorrectlyIdentifyLowStockProducts() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         List<Product> lowStockProducts = Arrays.asList(testProduct);
         
         when(stockRepository.findProductsWithLowStock(5L)).thenReturn(lowStockProducts);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         List<Product> result = stockService.getProductsWithLowStock(5);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).hasSize(1);
         assertThat(result.get(0)).isEqualTo(testProduct);
         
@@ -403,16 +403,16 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรตรวจสอบสต็อกต่ำได้ถูกต้อง - Should correctly check if stock is low")
+    @DisplayName("Should correctly check if stock is low")
     void shouldCorrectlyCheckIfStockIsLow() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
-        when(stockRepository.countAvailableByProductId(productId)).thenReturn(3L); // น้อยกว่า threshold (5)
+        when(stockRepository.countAvailableByProductId(productId)).thenReturn(3L); // Less than threshold (5)
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         boolean result = stockService.isLowStock(productId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isTrue();
         
         verify(productRepository).findById(productId);
@@ -420,17 +420,17 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรล้างการจองที่หมดอายุได้สำเร็จ - Should cleanup expired reservations successfully")
+    @DisplayName("Should cleanup expired reservations successfully")
     void shouldCleanupExpiredReservationsSuccessfully() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         int expectedCleanedCount = 5;
         
         when(stockRepository.clearExpiredReservations()).thenReturn(expectedCleanedCount);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         int result = stockService.cleanupExpiredReservations();
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isEqualTo(expectedCleanedCount);
         
         verify(stockRepository).clearExpiredReservations();
@@ -439,17 +439,17 @@ class StockServiceImplTest {
     // ==================== UTILITY OPERATIONS TESTS ====================
     
     @Test
-    @DisplayName("ควรหาข้อมูลบัญชีที่ซ้ำได้ - Should find duplicate credentials")
+    @DisplayName("Should find duplicate credentials")
     void shouldFindDuplicateCredentials() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         List<String> duplicates = Arrays.asList("duplicate_cred1", "duplicate_cred2");
         
         when(stockRepository.findDuplicateCredentialsByProductId(productId)).thenReturn(duplicates);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         List<String> result = stockService.findDuplicateCredentials(productId);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).hasSize(2);
         assertThat(result).containsExactly("duplicate_cred1", "duplicate_cred2");
         
@@ -457,35 +457,35 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรตรวจสอบการมีอยู่ของข้อมูลบัญชีได้ - Should check credentials existence")
+    @DisplayName("Should check credentials existence")
     void shouldCheckCredentialsExistence() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         String credentials = "test_credentials";
         
         when(stockRepository.existsByProductIdAndCredentials(productId, credentials)).thenReturn(true);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         boolean result = stockService.credentialsExist(productId, credentials);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isTrue();
         
         verify(stockRepository).existsByProductIdAndCredentials(productId, credentials);
     }
     
     @Test
-    @DisplayName("ควรอัปเดตเกณฑ์สต็อกต่ำได้สำเร็จ - Should update low stock threshold successfully")
+    @DisplayName("Should update low stock threshold successfully")
     void shouldUpdateLowStockThresholdSuccessfully() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         int newThreshold = 10;
         
         when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
         when(productRepository.save(testProduct)).thenReturn(testProduct);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         stockService.updateLowStockThreshold(productId, newThreshold);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(testProduct.getLowStockThreshold()).isEqualTo(newThreshold);
         
         verify(productRepository).findById(productId);
@@ -495,12 +495,12 @@ class StockServiceImplTest {
     // ==================== ERROR HANDLING TESTS ====================
     
     @Test
-    @DisplayName("ควรโยน ResourceNotFoundException เมื่อไม่พบสต็อกในการอัปเดต - Should throw ResourceNotFoundException when stock not found for update")
+    @DisplayName("Should throw ResourceNotFoundException when stock not found for update")
     void shouldThrowExceptionWhenStockNotFoundForUpdate() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         when(stockRepository.findById(stockId)).thenReturn(Optional.empty());
         
-        // When & Then - เรียกใช้และตรวจสอบ exception
+        // When & Then - Execute and verify exception
         assertThatThrownBy(() -> stockService.updateStockAdditionalInfo(stockId, "new info"))
             .isInstanceOf(ResourceNotFoundException.class)
             .hasMessageContaining("Stock not found with ID: " + stockId);
@@ -510,14 +510,14 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรโยน StockException เมื่อพยายามลบสต็อกที่ขายแล้ว - Should throw StockException when deleting sold stock")
+    @DisplayName("Should throw StockException when deleting sold stock")
     void shouldThrowExceptionWhenDeletingSoldStock() {
-        // Given - เตรียมข้อมูล (สต็อกที่ขายแล้ว)
+        // Given - Prepare data (stock that is already sold)
         testStock.markAsSold();
         
         when(stockRepository.findById(stockId)).thenReturn(Optional.of(testStock));
         
-        // When & Then - เรียกใช้และตรวจสอบ exception
+        // When & Then - Execute and verify exception
         assertThatThrownBy(() -> stockService.deleteStock(stockId))
             .isInstanceOf(StockException.class)
             .hasMessageContaining("Cannot delete sold stock item");
@@ -527,14 +527,14 @@ class StockServiceImplTest {
     }
     
     @Test
-    @DisplayName("ควรโยน StockException เมื่อพยายามลบสต็อกที่ถูกจองอยู่ - Should throw StockException when deleting reserved stock")
+    @DisplayName("Should throw StockException when deleting reserved stock")
     void shouldThrowExceptionWhenDeletingReservedStock() {
-        // Given - เตรียมข้อมูล (สต็อกที่ถูกจอง)
+        // Given - Prepare data (stock that is reserved)
         testStock.reserve(15);
         
         when(stockRepository.findById(stockId)).thenReturn(Optional.of(testStock));
         
-        // When & Then - เรียกใช้และตรวจสอบ exception
+        // When & Then - Execute and verify exception
         assertThatThrownBy(() -> stockService.deleteStock(stockId))
             .isInstanceOf(StockException.class)
             .hasMessageContaining("Cannot delete reserved stock item");
@@ -546,9 +546,9 @@ class StockServiceImplTest {
     // ==================== PAGEABLE TESTS ====================
     
     @Test
-    @DisplayName("ควรดึงสต็อกแบบแบ่งหน้าได้ถูกต้อง - Should get paginated stock correctly")
+    @DisplayName("Should get paginated stock correctly")
     void shouldGetPaginatedStockCorrectly() {
-        // Given - เตรียมข้อมูล
+        // Given - Prepare data
         Pageable pageable = PageRequest.of(0, 10);
         List<Stock> stockList = Arrays.asList(testStock);
         Page<Stock> stockPage = new PageImpl<>(stockList, pageable, 1);
@@ -556,10 +556,10 @@ class StockServiceImplTest {
         when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
         when(stockRepository.findByProduct(testProduct, pageable)).thenReturn(stockPage);
         
-        // When - เรียกใช้เมธอด
+        // When - Execute method
         Page<Stock> result = stockService.getStockByProduct(productId, pageable);
         
-        // Then - ตรวจสอบผลลัพธ์
+        // Then - Verify results
         assertThat(result).isNotNull();
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0)).isEqualTo(testStock);

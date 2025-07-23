@@ -14,333 +14,301 @@ import java.util.UUID;
  * Service interface for stock inventory management operations.
  * Handles stock availability, reservations, sales tracking, and notifications.
  * 
- * อินเทอร์เฟซสำหรับการจัดการสต็อกสินค้า
- * รองรับการตรวจสอบความพร้อม การจองสินค้า การติดตามการขาย และการแจ้งเตือน
+ * Interface for stock inventory management
+ * Supports availability checking, product reservation, sales tracking, and notifications
  */
 public interface StockService {
 
     // ==================== BASIC STOCK OPERATIONS ====================
 
     /**
-     * สร้างรายการสต็อกใหม่สำหรับสินค้า
      * Create new stock item for a product
      * 
-     * @param productId ID ของสินค้า
-     * @param credentials ข้อมูลบัญชีที่เข้ารหัสแล้ว
-     * @param additionalInfo ข้อมูลเพิ่มเติม (ถ้ามี)
-     * @return Stock รายการสต็อกที่สร้างขึ้น
-     * @throws ResourceNotFoundException หากไม่พบสินค้า
-     * @throws ResourceAlreadyExistsException หากมีข้อมูลบัญชีซ้ำ
+     * @param productId ID of the product
+     * @param credentials encrypted account credentials
+     * @param additionalInfo additional information (if any)
+     * @return Stock the created stock item
+     * @throws ResourceNotFoundException if product is not found
+     * @throws ResourceAlreadyExistsException if credentials already exist
      */
     Stock createStock(UUID productId, String credentials, String additionalInfo);
 
     /**
-     * สร้างรายการสต็อกหลายรายการพร้อมกัน
      * Create multiple stock items for a product in bulk
      * 
-     * @param productId ID ของสินค้า
-     * @param credentialsList รายการข้อมูลบัญชีที่เข้ารหัสแล้ว
-     * @return List<Stock> รายการสต็อกที่สร้างขึ้น
-     * @throws ResourceNotFoundException หากไม่พบสินค้า
+     * @param productId ID of the product
+     * @param credentialsList list of encrypted account credentials
+     * @return List<Stock> list of created stock items
+     * @throws ResourceNotFoundException if product is not found
      */
     List<Stock> createBulkStock(UUID productId, List<String> credentialsList);
 
     /**
-     * ดึงข้อมูลสต็อกทั้งหมดของสินค้า
      * Get all stock items for a product
      * 
-     * @param productId ID ของสินค้า
-     * @param pageable การแบ่งหน้าข้อมูล
-     * @return Page<Stock> รายการสต็อกแบบแบ่งหน้า
+     * @param productId ID of the product
+     * @param pageable pagination parameters
+     * @return Page<Stock> paginated list of stock items
      */
     Page<Stock> getStockByProduct(UUID productId, Pageable pageable);
 
     /**
-     * ดึงข้อมูลสต็อกโดย ID
      * Get stock item by ID
      * 
-     * @param stockId ID ของสต็อก
-     * @return Optional<Stock> รายการสต็อก หรือ empty หากไม่พบ
+     * @param stockId ID of the stock
+     * @return Optional<Stock> stock item or empty if not found
      */
     Optional<Stock> getStockById(UUID stockId);
 
     /**
-     * อัปเดตข้อมูลเพิ่มเติมของสต็อก
      * Update additional information of stock item
      * 
-     * @param stockId ID ของสต็อก
-     * @param additionalInfo ข้อมูลเพิ่มเติมใหม่
-     * @return Stock รายการสต็อกที่อัปเดตแล้ว
-     * @throws ResourceNotFoundException หากไม่พบสต็อก
+     * @param stockId ID of the stock
+     * @param additionalInfo new additional information
+     * @return Stock updated stock item
+     * @throws ResourceNotFoundException if stock is not found
      */
     Stock updateStockAdditionalInfo(UUID stockId, String additionalInfo);
 
     /**
-     * ลบรายการสต็อก (เฉพาะที่ยังไม่ได้ขาย)
      * Delete stock item (only if not sold)
      * 
-     * @param stockId ID ของสต็อก
-     * @throws ResourceNotFoundException หากไม่พบสต็อก
-     * @throws StockException หากสต็อกถูกขายแล้วหรือถูกจองอยู่
+     * @param stockId ID of the stock
+     * @throws ResourceNotFoundException if stock is not found
+     * @throws StockException if stock is already sold or reserved
      */
     void deleteStock(UUID stockId);
 
     // ==================== STOCK AVAILABILITY OPERATIONS ====================
 
     /**
-     * ตรวจสอบสต็อกที่มีจำหน่ายของสินค้า
      * Get available stock count for a product
      * 
-     * @param productId ID ของสินค้า
-     * @return long จำนวนสต็อกที่มีจำหน่าย
+     * @param productId ID of the product
+     * @return long number of available stock items
      */
     long getAvailableStockCount(UUID productId);
 
     /**
-     * ตรวจสอบสต็อกทั้งหมดของสินค้า
      * Get total stock count for a product
      * 
-     * @param productId ID ของสินค้า
-     * @return long จำนวนสต็อกทั้งหมด
+     * @param productId ID of the product
+     * @return long total number of stock items
      */
     long getTotalStockCount(UUID productId);
 
     /**
-     * ดึงรายการสต็อกที่มีจำหน่ายของสินค้า
      * Get available stock items for a product
      * 
-     * @param productId ID ของสินค้า
-     * @return List<Stock> รายการสต็อกที่มีจำหน่าย
+     * @param productId ID of the product
+     * @return List<Stock> list of available stock items
      */
     List<Stock> getAvailableStock(UUID productId);
 
     /**
-     * ดึงสต็อกรายการแรกที่มีจำหน่ายของสินค้า
      * Get first available stock item for a product (FIFO)
      * 
-     * @param productId ID ของสินค้า
-     * @return Optional<Stock> สต็อกรายการแรกที่มีจำหน่าย หรือ empty หากไม่มี
+     * @param productId ID of the product
+     * @return Optional<Stock> first available stock item or empty if none available
      */
     Optional<Stock> getFirstAvailableStock(UUID productId);
 
     /**
-     * ตรวจสอบว่าสินค้ามีสต็อกหรือไม่
      * Check if product has available stock
      * 
-     * @param productId ID ของสินค้า
-     * @return boolean true หากมีสต็อก, false หากไม่มี
+     * @param productId ID of the product
+     * @return boolean true if stock is available, false if not
      */
     boolean isInStock(UUID productId);
 
     /**
-     * ตรวจสอบว่าสินค้าหมดสต็อกหรือไม่
      * Check if product is out of stock
      * 
-     * @param productId ID ของสินค้า
-     * @return boolean true หากหมดสต็อก, false หากยังมีสต็อก
+     * @param productId ID of the product
+     * @return boolean true if out of stock, false if stock is available
      */
     boolean isOutOfStock(UUID productId);
 
     // ==================== STOCK RESERVATION OPERATIONS ====================
 
     /**
-     * จองสต็อกสำหรับการซื้อ (จองชั่วคราว)
      * Reserve stock for purchase (temporary reservation)
      * 
-     * @param productId ID ของสินค้า
-     * @param quantity จำนวนที่ต้องการจอง
-     * @param reservationDurationMinutes ระยะเวลาการจองเป็นนาที
-     * @return List<Stock> รายการสต็อกที่จองได้
+     * @param productId ID of the product
+     * @param quantity number of items to reserve
+     * @param reservationDurationMinutes reservation duration in minutes
+     * @return List<Stock> list of reserved stock items
      * @throws OutOfStockException หากสต็อกไม่เพียงพอ
      * @throws StockReservationException หากจองไม่สำเร็จ
      */
     List<Stock> reserveStock(UUID productId, int quantity, int reservationDurationMinutes);
 
     /**
-     * จองสต็อกจนถึงเวลาที่กำหนด
      * Reserve stock until specific time
      * 
-     * @param productId ID ของสินค้า
-     * @param quantity จำนวนที่ต้องการจอง
-     * @param reservedUntil เวลาสิ้นสุดการจอง
-     * @return List<Stock> รายการสต็อกที่จองได้
+     * @param productId ID of the product
+     * @param quantity number of items to reserve
+     * @param reservedUntil reservation end time
+     * @return List<Stock> list of reserved stock items
      * @throws OutOfStockException หากสต็อกไม่เพียงพอ
      * @throws StockReservationException หากจองไม่สำเร็จ
      */
     List<Stock> reserveStockUntil(UUID productId, int quantity, LocalDateTime reservedUntil);
 
     /**
-     * ยกเลิกการจองสต็อก
      * Release stock reservation
      * 
-     * @param stockIds รายการ ID ของสต็อกที่ต้องการยกเลิกการจอง
-     * @return int จำนวนสต็อกที่ยกเลิกการจองได้
+     * @param stockIds list of stock IDs to cancel reservation
+     * @return int number of reservations released
      */
     int releaseReservation(List<UUID> stockIds);
 
     /**
-     * ยกเลิกการจองสต็อกรายการเดียว
      * Release single stock reservation
      * 
-     * @param stockId ID ของสต็อกที่ต้องการยกเลิกการจอง
-     * @return boolean true หากยกเลิกสำเร็จ, false หากไม่สำเร็จ
-     * @throws ResourceNotFoundException หากไม่พบสต็อก
+     * @param stockId ID of the stock to cancel reservation
+     * @return boolean true if release successful, false if unsuccessful
+     * @throws ResourceNotFoundException if stock is not found
      */
     boolean releaseReservation(UUID stockId);
 
     /**
-     * ดึงรายการสต็อกที่ถูกจองอยู่
      * Get currently reserved stock items
      * 
-     * @param productId ID ของสินค้า (null หากต้องการทุกสินค้า)
-     * @return List<Stock> รายการสต็อกที่ถูกจองอยู่
+     * @param productId ID of the product (null for all products)
+     * @return List<Stock> list of currently reserved stock items
      */
     List<Stock> getReservedStock(UUID productId);
 
     /**
-     * ตรวจสอบจำนวนสต็อกที่ถูกจองอยู่
      * Get reserved stock count for a product
      * 
-     * @param productId ID ของสินค้า
-     * @return long จำนวนสต็อกที่ถูกจองอยู่
+     * @param productId ID of the product
+     * @return long number of reserved stock items
      */
     long getReservedStockCount(UUID productId);
 
     // ==================== STOCK SALES OPERATIONS ====================
 
     /**
-     * ทำเครื่องหมายสต็อกว่าขายแล้ว
      * Mark stock as sold
      * 
-     * @param stockId ID ของสต็อก
-     * @return Stock รายการสต็อกที่ทำเครื่องหมายขายแล้ว
-     * @throws ResourceNotFoundException หากไม่พบสต็อก
-     * @throws StockException หากสต็อกถูกขายแล้ว
+     * @param stockId ID of the stock
+     * @return Stock stock item marked as sold
+     * @throws ResourceNotFoundException if stock is not found
+     * @throws StockException if stock is already sold
      */
     Stock markAsSold(UUID stockId);
 
     /**
-     * ทำเครื่องหมายสต็อกหลายรายการว่าขายแล้ว
      * Mark multiple stock items as sold
      * 
-     * @param stockIds รายการ ID ของสต็อกที่ต้องการทำเครื่องหมายขายแล้ว
-     * @return List<Stock> รายการสต็อกที่ทำเครื่องหมายขายแล้ว
+     * @param stockIds list of stock IDs to mark as sold
+     * @return List<Stock> list of stock items marked as sold
      */
     List<Stock> markAsSold(List<UUID> stockIds);
 
     /**
-     * ดึงรายการสต็อกที่ขายแล้ว
      * Get sold stock items
      * 
-     * @param productId ID ของสินค้า (null หากต้องการทุกสินค้า)
-     * @param startDate วันที่เริ่มต้น (null หากไม่จำกัด)
-     * @param endDate วันที่สิ้นสุด (null หากไม่จำกัด)
-     * @return List<Stock> รายการสต็อกที่ขายแล้ว
+     * @param productId ID of the product (null for all products)
+     * @param startDate start date (null for no limit)
+     * @param endDate end date (null for no limit)
+     * @return List<Stock> list of sold stock items
      */
     List<Stock> getSoldStock(UUID productId, LocalDateTime startDate, LocalDateTime endDate);
 
     /**
-     * ตรวจสอบจำนวนสต็อกที่ขายแล้ว
      * Get sold stock count for a product
      * 
-     * @param productId ID ของสินค้า
-     * @return long จำนวนสต็อกที่ขายแล้ว
+     * @param productId ID of the product
+     * @return long number of sold stock items
      */
     long getSoldStockCount(UUID productId);
 
     // ==================== INVENTORY MANAGEMENT OPERATIONS ====================
 
     /**
-     * ดึงสถิติสต็อกของสินค้า
      * Get stock statistics for a product
      * 
-     * @param productId ID ของสินค้า
-     * @return StockStatistics สถิติของสต็อก
+     * @param productId ID of the product
+     * @return StockStatistics stock statistics
      */
     StockStatistics getStockStatistics(UUID productId);
 
     /**
-     * ตรวจสอบสินค้าที่มีสต็อกต่ำ
      * Get products with low stock
      * 
-     * @param threshold ค่าขีดจำกัดสต็อกต่ำ (null หากใช้ค่าของสินค้า)
-     * @return List<Product> รายการสินค้าที่มีสต็อกต่ำ
+     * @param threshold low stock threshold (null to use product's value)
+     * @return List<Product> list of products with low stock
      */
     List<Product> getProductsWithLowStock(Integer threshold);
 
     /**
-     * ตรวจสอบว่าสินค้ามีสต็อกต่ำหรือไม่
      * Check if product has low stock
      * 
-     * @param productId ID ของสินค้า
-     * @return boolean true หากสต็อกต่ำ, false หากสต็อกปกติ
+     * @param productId ID of the product
+     * @return boolean true if stock is low, false if stock is normal
      */
     boolean isLowStock(UUID productId);
 
     /**
-     * ล้างการจองที่หมดอายุ
      * Clean up expired reservations
      * 
-     * @return int จำนวนการจองที่ล้างได้
+     * @return int number of reservations cleaned up
      */
     int cleanupExpiredReservations();
 
     /**
-     * ดึงรายการการจองที่หมดอายุ
      * Get expired reservations
      * 
-     * @return List<Stock> รายการสต็อกที่การจองหมดอายุแล้ว
+     * @return List<Stock> list of stock items with expired reservations
      */
     List<Stock> getExpiredReservations();
 
     /**
-     * ดึงรายการการจองที่ใกล้หมดอายุ
      * Get reservations expiring soon
      * 
-     * @param withinMinutes ระยะเวลาที่ถือว่า "ใกล้หมดอายุ" เป็นนาที
-     * @return List<Stock> รายการสต็อกที่การจองใกล้หมดอายุ
+     * @param withinMinutes time frame considered as "expiring soon" in minutes
+     * @return List<Stock> list of stock items with reservations expiring soon
      */
     List<Stock> getReservationsExpiringSoon(int withinMinutes);
 
     // ==================== UTILITY OPERATIONS ====================
 
     /**
-     * ตรวจสอบการซ้ำของข้อมูลบัญชีในสินค้า
      * Check for duplicate credentials in product stock
      * 
-     * @param productId ID ของสินค้า
-     * @return List<String> รายการข้อมูลบัญชีที่ซ้ำ
+     * @param productId ID of the product
+     * @return List<String> list of duplicate credentials
      */
     List<String> findDuplicateCredentials(UUID productId);
 
     /**
-     * ตรวจสอบว่าข้อมูลบัญชีมีอยู่แล้วหรือไม่
      * Check if credentials already exist for a product
      * 
-     * @param productId ID ของสินค้า
-     * @param credentials ข้อมูลบัญชีที่ต้องการตรวจสอบ
-     * @return boolean true หากมีอยู่แล้ว, false หากไม่มี
+     * @param productId ID of the product
+     * @param credentials credentials to check
+     * @return boolean true if already exists, false if not
      */
     boolean credentialsExist(UUID productId, String credentials);
 
     /**
-     * อัปเดตเกณฑ์สต็อกต่ำของสินค้า
      * Update low stock threshold for a product
      * 
-     * @param productId ID ของสินค้า
-     * @param threshold ค่าเกณฑ์สต็อกต่ำใหม่
-     * @throws ResourceNotFoundException หากไม่พบสินค้า
+     * @param productId ID of the product
+     * @param threshold new low stock threshold
+     * @throws ResourceNotFoundException if product is not found
      */
     void updateLowStockThreshold(UUID productId, int threshold);
 
     /**
-     * Class สำหรับเก็บสถิติของสต็อก
      * Class for storing stock statistics
      */
     record StockStatistics(
-        long total,        // จำนวนสต็อกทั้งหมด
-        long available,    // จำนวนสต็อกที่มีจำหน่าย
-        long sold,         // จำนวนสต็อกที่ขายแล้ว
-        long reserved      // จำนวนสต็อกที่ถูกจองอยู่
+        long total,        // total stock count
+        long available,    // available stock count
+        long sold,         // sold stock count
+        long reserved      // reserved stock count
     ) {}
 }

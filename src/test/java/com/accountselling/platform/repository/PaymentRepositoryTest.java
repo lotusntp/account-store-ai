@@ -26,8 +26,8 @@ import static org.assertj.core.api.Assertions.*;
  * Tests payment management operations including payment tracking,
  * status management, transaction handling, and financial reporting.
  * 
- * การทดสอบ PaymentRepository ครอบคลุมการจัดการการชำระเงิน
- * การติดตามสถานะ การจัดการธุรกรรม และการรายงานทางการเงิน
+ * PaymentRepository testing covering payment management
+ * status tracking, transaction handling, and financial reporting
  */
 @DataJpaTest
 @ActiveProfiles("test")

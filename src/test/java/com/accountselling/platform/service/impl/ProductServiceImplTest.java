@@ -27,8 +27,8 @@ import static org.mockito.Mockito.*;
  * Unit tests for ProductServiceImpl.
  * Tests product management functionality including search, filtering, stock operations, and CRUD.
  * 
- * การทดสอบ ProductServiceImpl
- * ทดสอบฟังก์ชันการจัดการสินค้ารวมถึงการค้นหา การกรอง การจัดการสต็อก และการจัดการข้อมูล
+ * ProductServiceImpl testing
+ * Tests product management functions including search, filtering, stock management, and data operations
  */
 @ExtendWith(MockitoExtension.class)
 class ProductServiceImplTest {

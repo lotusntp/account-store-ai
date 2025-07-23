@@ -27,8 +27,8 @@ import static org.assertj.core.api.Assertions.*;
  * Tests all stock management operations including availability checks,
  * reservations, sales tracking, and cleanup operations.
  * 
- * การทดสอบ StockRepository ครอบคลุมการจัดการสต็อก
- * การตรวจสอบความพร้อมใช้งาน การจอง การติดตามการขาย และการล้างข้อมูล
+ * Comprehensive StockRepository testing covering stock management
+ * availability checks, reservations, sales tracking, and data cleanup
  */
 @DataJpaTest
 @ActiveProfiles("test")

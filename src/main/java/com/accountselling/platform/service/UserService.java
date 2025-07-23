@@ -11,7 +11,7 @@ import java.util.UUID;
  * Service interface for user management operations.
  * Extends UserDetailsService for Spring Security integration.
  * 
- * บริการสำหรับการจัดการผู้ใช้และการทำงานร่วมกับ Spring Security
+ * Service for user management and Spring Security integration
  */
 public interface UserService extends UserDetailsService {
 
