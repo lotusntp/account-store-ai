@@ -626,7 +626,8 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
      * @param username the username
      * @return list of payments for the specified user
      */
-    List<Payment> findByUsername(String username);
+    @Query("select p from Payment p where p.order.user.username = :username")
+    List<Payment> findByUsername(@Param("username") String username);
 
     /**
      * Find payments created between dates.

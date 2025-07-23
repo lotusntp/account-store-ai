@@ -653,7 +653,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
    * @param username the username to search for
    * @return list of orders for the username
    */
-  List<Order> findByUsername(String username);
+  List<Order> findByUserUsername(String username);
 
   /**
    * Find orders by username with pagination. Used for paginated admin search.
@@ -662,5 +662,5 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
    * @param pageable pagination parameters
    * @return page of orders for the username
    */
-  Page<Order> findByUsername(String username, Pageable pageable);
+  Page<Order> findByUserUsername(String username, Pageable pageable);
 }

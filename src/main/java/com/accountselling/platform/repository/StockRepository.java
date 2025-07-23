@@ -302,15 +302,20 @@ public interface StockRepository extends JpaRepository<Stock, UUID> {
      * @return list of products with stock below threshold grouped by category
      */
     @Query("""
-        SELECT s.product FROM Stock s 
-        WHERE s.product IN (
-            SELECT p FROM Product p WHERE 
-            (SELECT COUNT(st) FROM Stock st WHERE st.product = p AND st.sold = false AND (st.reservedUntil IS NULL OR st.reservedUntil < CURRENT_TIMESTAMP)) <= :threshold
-        )
-        GROUP BY s.product
-        ORDER BY s.product.category.name, s.product.name
-        """)
+    SELECT s.product FROM Stock s 
+    WHERE s.product IN (
+        SELECT p FROM Product p WHERE 
+        (SELECT COUNT(st) FROM Stock st 
+            WHERE st.product = p 
+              AND st.sold = false 
+              AND (st.reservedUntil IS NULL OR st.reservedUntil < CURRENT_TIMESTAMP)
+        ) <= :threshold
+    )
+    GROUP BY s.product, s.product.category.name, s.product.name
+    ORDER BY s.product.category.name, s.product.name
+""")
     List<Product> findProductsWithLowStock(@Param("threshold") long threshold);
+
 
     /**
      * Find stock items by credentials pattern.

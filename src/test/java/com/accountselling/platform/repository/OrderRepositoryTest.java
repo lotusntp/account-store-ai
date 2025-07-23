@@ -561,7 +561,7 @@ class OrderRepositoryTest {
     @DisplayName("Should find orders by username")
     void shouldFindOrdersByUsername() {
         // When
-        List<Order> result = orderRepository.findByUsername("testuser2");
+        List<Order> result = orderRepository.findByUserUsername("testuser2");
 
         // Then
         assertThat(result).hasSize(2);
@@ -577,7 +577,7 @@ class OrderRepositoryTest {
         Pageable pageable = PageRequest.of(0, 1);
 
         // When
-        Page<Order> result = orderRepository.findByUsername("testuser1", pageable);
+        Page<Order> result = orderRepository.findByUserUsername("testuser1", pageable);
 
         // Then
         assertThat(result.getContent()).hasSize(1);

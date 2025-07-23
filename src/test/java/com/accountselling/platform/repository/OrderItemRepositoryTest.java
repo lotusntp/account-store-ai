@@ -85,11 +85,13 @@ class OrderItemRepositoryTest {
     testStock3.markAsSold();
     entityManager.persistAndFlush(testStock3);
 
-    // Create test orders
+    // Create test orders with unique order numbers
     testOrder1 = new Order(testUser1, new BigDecimal("300.00"), OrderStatus.COMPLETED);
+    testOrder1.setOrderNumber("TEST-ORDER-1-" + System.nanoTime());
     entityManager.persistAndFlush(testOrder1);
 
     testOrder2 = new Order(testUser2, new BigDecimal("200.00"), OrderStatus.COMPLETED);
+    testOrder2.setOrderNumber("TEST-ORDER-2-" + System.nanoTime());
     entityManager.persistAndFlush(testOrder2);
 
     // Create test order items
@@ -477,8 +479,8 @@ class OrderItemRepositoryTest {
         orderItemRepository.searchOrderItems(
             "Product 1",
             "Test Category",
-            "Server1",
-                OrderStatus.PENDING,
+            "testuser1",
+            OrderStatus.COMPLETED,
             null,
             null,
             new BigDecimal("50.00"),

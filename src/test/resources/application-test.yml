@@ -43,3 +43,8 @@ otel:
     exporter: none
   logs:
     exporter: none
+
+jwt:
+  secret: dGhpc19pc19hX3NlY3VyZV9zZWNyZXRfa2V5X2Zvcl9qd3RfdG9rZW5zX3RoYXRfaXNfbG9uZ19lbm91Z2g
+  refresh-expiration: 3600000 # 1 ชั่วโมง (ms) หรือปรับตามโค้ดจริง
+  expiration: 3600000

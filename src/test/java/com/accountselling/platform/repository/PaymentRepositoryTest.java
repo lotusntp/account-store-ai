@@ -53,8 +53,8 @@ class PaymentRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        // Create test users
         String validPassword = "$2a$10$12345678901234567890123456789012345678901234567890122";
+
         testUser1 = new User("testuser1", validPassword, "user1@test.com");
         entityManager.persistAndFlush(testUser1);
 
@@ -63,12 +63,15 @@ class PaymentRepositoryTest {
 
         // Create test orders
         testOrder1 = new Order(testUser1, new BigDecimal("100.00"), OrderStatus.PENDING);
+        testOrder1.setOrderNumber("ORD-TEST-001");
         entityManager.persistAndFlush(testOrder1);
 
         testOrder2 = new Order(testUser1, new BigDecimal("200.00"), OrderStatus.COMPLETED);
+        testOrder2.setOrderNumber("ORD-TEST-002");
         entityManager.persistAndFlush(testOrder2);
 
         testOrder3 = new Order(testUser2, new BigDecimal("300.00"), OrderStatus.PROCESSING);
+        testOrder3.setOrderNumber("ORD-TEST-003");
         entityManager.persistAndFlush(testOrder3);
 
         // Create test payments with different statuses
@@ -76,7 +79,7 @@ class PaymentRepositoryTest {
         pendingPayment.setStatus(PaymentStatus.PENDING);
         pendingPayment.setPaymentReference("PAY-PENDING-001");
         pendingPayment.setQrCodeUrl("https://example.com/qr1");
-        pendingPayment.setExpirationTime(60); // 60 minutes from now
+        pendingPayment.setExpirationTime(60);
         entityManager.persistAndFlush(pendingPayment);
 
         processingPayment = new Payment(testOrder3, new BigDecimal("300.00"), "BANK_TRANSFER");
@@ -94,6 +97,7 @@ class PaymentRepositoryTest {
 
         // Create additional test orders for failed and refunded payments
         Order failedOrder = new Order(testUser2, new BigDecimal("150.00"), OrderStatus.FAILED);
+        failedOrder.setOrderNumber("ORD-TEST-004");
         entityManager.persistAndFlush(failedOrder);
 
         failedPayment = new Payment(failedOrder, new BigDecimal("150.00"), "CREDIT_CARD");
@@ -103,6 +107,7 @@ class PaymentRepositoryTest {
         entityManager.persistAndFlush(failedPayment);
 
         Order refundedOrder = new Order(testUser1, new BigDecimal("250.00"), OrderStatus.COMPLETED);
+        refundedOrder.setOrderNumber("ORD-TEST-005");
         entityManager.persistAndFlush(refundedOrder);
 
         refundedPayment = new Payment(refundedOrder, new BigDecimal("250.00"), "QR_CODE");
@@ -114,8 +119,9 @@ class PaymentRepositoryTest {
         refundedPayment.setRefundedAt(LocalDateTime.now().minusHours(2));
         entityManager.persistAndFlush(refundedPayment);
 
-        entityManager.clear(); // Clear persistence context
+        entityManager.clear();
     }
+
 
     // ==================== BASIC PAYMENT QUERIES TESTS ====================
 
