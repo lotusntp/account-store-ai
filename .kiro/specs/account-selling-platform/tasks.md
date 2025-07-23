@@ -114,7 +114,7 @@
     - Write unit tests for services
     - _Requirements: 2.1, 2.2, 2.4, 2.5, 2.6_
 
-  - [ ] 4.3 Implement inventory management services
+  - [x] 4.3 Implement inventory management services
 
     - Create StockService
     - Implement stock reservation mechanism

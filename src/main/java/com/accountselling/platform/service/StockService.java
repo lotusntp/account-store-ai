@@ -1,5 +1,6 @@
 package com.accountselling.platform.service;
 
+import com.accountselling.platform.dto.stock.StockStatistics;
 import com.accountselling.platform.model.Product;
 import com.accountselling.platform.model.Stock;
 import org.springframework.data.domain.Page;
@@ -302,13 +303,22 @@ public interface StockService {
      */
     void updateLowStockThreshold(UUID productId, int threshold);
 
+    // ==================== LOW STOCK NOTIFICATION OPERATIONS ====================
+
     /**
-     * Class for storing stock statistics
+     * Check and notify administrators about low stock products
+     * This method should be called periodically or after stock changes
+     * 
+     * @return List<Product> products that have low stock and need attention
      */
-    record StockStatistics(
-        long total,        // total stock count
-        long available,    // available stock count
-        long sold,         // sold stock count
-        long reserved      // reserved stock count
-    ) {}
+    List<Product> checkAndNotifyLowStock();
+
+    /**
+     * Check if a specific product needs low stock notification after stock change
+     * This method is called after stock operations to immediately check if notification is needed
+     * 
+     * @param productId ID of the product to check
+     * @return boolean true if notification was sent, false if stock is normal
+     */
+    boolean checkAndNotifyLowStockForProduct(UUID productId);
 }

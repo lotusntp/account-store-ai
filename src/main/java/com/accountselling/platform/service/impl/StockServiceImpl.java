@@ -1,5 +1,6 @@
 package com.accountselling.platform.service.impl;
 
+import com.accountselling.platform.dto.stock.StockStatistics;
 import com.accountselling.platform.exception.*;
 import com.accountselling.platform.model.Product;
 import com.accountselling.platform.model.Stock;
@@ -19,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Implementation of StockService for inventory management operations.
@@ -39,8 +39,7 @@ public class StockServiceImpl implements StockService {
     private final StockRepository stockRepository;
     private final ProductRepository productRepository;
     
-    // Default value for product reservation duration (minutes)
-    private static final int DEFAULT_RESERVATION_MINUTES = 15;
+
     
     // Default value for low stock threshold
     private static final int DEFAULT_LOW_STOCK_THRESHOLD = 5;
@@ -343,8 +342,12 @@ public class StockServiceImpl implements StockService {
             });
         
         try {
+            UUID productId = stock.getProduct().getId();
             stock.markAsSold();
             Stock savedStock = stockRepository.save(stock);
+            
+            // Check for low stock notification after sale
+            checkAndNotifyLowStockForProduct(productId);
             
             log.info("Successfully marked stock as sold ID: {}", stockId);
             
@@ -530,25 +533,69 @@ public class StockServiceImpl implements StockService {
                 product.getName());
     }
 
+    // ==================== LOW STOCK NOTIFICATION OPERATIONS ====================
+
     /**
-     * Inner class to hold stock statistics data
+     * Check and notify administrators about low stock products.
+     * This method should be called periodically or after stock changes.
+     * 
+     * @return List<Product> products that have low stock and need attention
      */
-    public static class StockStatistics {
-        private final long total;
-        private final long available;
-        private final long sold;
-        private final long reserved;
-
-        public StockStatistics(long total, long available, long sold, long reserved) {
-            this.total = total;
-            this.available = available;
-            this.sold = sold;
-            this.reserved = reserved;
+    public List<Product> checkAndNotifyLowStock() {
+        log.info("Checking for low stock products and sending notifications");
+        
+        List<Product> lowStockProducts = getProductsWithLowStock(null);
+        
+        if (!lowStockProducts.isEmpty()) {
+            log.warn("Found {} products with low stock", lowStockProducts.size());
+            
+            // Log each low stock product for monitoring/alerting systems
+            for (Product product : lowStockProducts) {
+                long availableCount = getAvailableStockCount(product.getId());
+                int threshold = product.getLowStockThreshold() != null ? 
+                    product.getLowStockThreshold() : DEFAULT_LOW_STOCK_THRESHOLD;
+                
+                log.warn("LOW STOCK ALERT: Product '{}' (ID: {}) has {} items available (threshold: {})", 
+                    product.getName(), product.getId(), availableCount, threshold);
+            }
+            
+            // In a real implementation, this would send notifications via:
+            // - Email to administrators
+            // - Push notifications to admin dashboard
+            // - Slack/Teams notifications
+            // - SMS alerts for critical items
+            // For now, we log the alerts which can be picked up by monitoring systems
         }
-
-        public long getTotal() { return total; }
-        public long getAvailable() { return available; }
-        public long getSold() { return sold; }
-        public long getReserved() { return reserved; }
+        
+        return lowStockProducts;
     }
+
+    /**
+     * Check if a specific product needs low stock notification after stock change.
+     * This method is called after stock operations to immediately check if notification is needed.
+     * 
+     * @param productId ID of the product to check
+     * @return boolean true if notification was sent, false if stock is normal
+     */
+    public boolean checkAndNotifyLowStockForProduct(UUID productId) {
+        log.debug("Checking low stock notification for product ID: {}", productId);
+        
+        if (isLowStock(productId)) {
+            Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+            
+            long availableCount = getAvailableStockCount(productId);
+            int threshold = product.getLowStockThreshold() != null ? 
+                product.getLowStockThreshold() : DEFAULT_LOW_STOCK_THRESHOLD;
+            
+            log.warn("LOW STOCK ALERT: Product '{}' (ID: {}) has {} items available (threshold: {})", 
+                product.getName(), productId, availableCount, threshold);
+            
+            // In a real implementation, this would trigger immediate notification
+            return true;
+        }
+        
+        return false;
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.accountselling.platform.service.impl;
 
+import com.accountselling.platform.dto.stock.StockStatistics;
 import com.accountselling.platform.exception.*;
 import com.accountselling.platform.model.Category;
 import com.accountselling.platform.model.Product;
@@ -332,6 +333,9 @@ class StockServiceImplTest {
         // Given - Prepare data
         when(stockRepository.findById(stockId)).thenReturn(Optional.of(testStock));
         when(stockRepository.save(testStock)).thenReturn(testStock);
+        // Mock for low stock notification check
+        when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
+        when(stockRepository.countAvailableByProductId(productId)).thenReturn(10L); // Normal stock
         
         // When - Execute method
         Stock result = stockService.markAsSold(stockId);
@@ -343,6 +347,8 @@ class StockServiceImplTest {
         
         verify(stockRepository).findById(stockId);
         verify(stockRepository).save(testStock);
+        verify(productRepository).findById(productId);
+        verify(stockRepository).countAvailableByProductId(productId);
     }
     
     @Test
@@ -373,8 +379,8 @@ class StockServiceImplTest {
         when(stockRepository.getStockStatisticsByProductId(productId)).thenReturn(mockStats);
         
         // When - Execute method
-        StockService.StockStatistics result = stockService.getStockStatistics(productId);
-        
+        StockStatistics result = stockService.getStockStatistics(productId);
+
         // Then - Verify results
         assertThat(result.total()).isEqualTo(10L);
         assertThat(result.available()).isEqualTo(7L);
@@ -543,6 +549,84 @@ class StockServiceImplTest {
         verify(stockRepository, never()).delete(any());
     }
     
+    // ==================== LOW STOCK NOTIFICATION TESTS ====================
+    
+    @Test
+    @DisplayName("Should check and notify low stock products")
+    void shouldCheckAndNotifyLowStockProducts() {
+        // Given - Prepare data
+        List<Product> lowStockProducts = Arrays.asList(testProduct);
+        
+        when(stockRepository.findProductsWithLowStock(5L)).thenReturn(lowStockProducts);
+        when(stockRepository.countAvailableByProductId(productId)).thenReturn(3L);
+        
+        // When - Execute method
+        List<Product> result = stockService.checkAndNotifyLowStock();
+        
+        // Then - Verify results
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isEqualTo(testProduct);
+        
+        verify(stockRepository).findProductsWithLowStock(5L);
+        verify(stockRepository).countAvailableByProductId(productId);
+    }
+    
+    @Test
+    @DisplayName("Should notify low stock for specific product")
+    void shouldNotifyLowStockForSpecificProduct() {
+        // Given - Prepare data
+        when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
+        when(stockRepository.countAvailableByProductId(productId)).thenReturn(3L); // Below threshold (5)
+        
+        // When - Execute method
+        boolean result = stockService.checkAndNotifyLowStockForProduct(productId);
+        
+        // Then - Verify results
+        assertThat(result).isTrue();
+        
+        verify(productRepository, times(2)).findById(productId); // Called twice: once in isLowStock, once in notification
+        verify(stockRepository, times(2)).countAvailableByProductId(productId);
+    }
+    
+    @Test
+    @DisplayName("Should not notify when stock is normal")
+    void shouldNotNotifyWhenStockIsNormal() {
+        // Given - Prepare data
+        when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
+        when(stockRepository.countAvailableByProductId(productId)).thenReturn(10L); // Above threshold (5)
+        
+        // When - Execute method
+        boolean result = stockService.checkAndNotifyLowStockForProduct(productId);
+        
+        // Then - Verify results
+        assertThat(result).isFalse();
+        
+        verify(productRepository).findById(productId);
+        verify(stockRepository).countAvailableByProductId(productId);
+    }
+    
+    @Test
+    @DisplayName("Should trigger low stock notification after marking as sold")
+    void shouldTriggerLowStockNotificationAfterMarkingAsSold() {
+        // Given - Prepare data
+        when(stockRepository.findById(stockId)).thenReturn(Optional.of(testStock));
+        when(stockRepository.save(testStock)).thenReturn(testStock);
+        when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
+        when(stockRepository.countAvailableByProductId(productId)).thenReturn(3L); // Low stock after sale
+        
+        // When - Execute method
+        Stock result = stockService.markAsSold(stockId);
+        
+        // Then - Verify results
+        assertThat(result).isNotNull();
+        assertThat(result.getSold()).isTrue();
+        
+        verify(stockRepository).findById(stockId);
+        verify(stockRepository).save(testStock);
+        verify(productRepository, times(2)).findById(productId); // Called in isLowStock and notification
+        verify(stockRepository, times(2)).countAvailableByProductId(productId);
+    }
+
     // ==================== PAGEABLE TESTS ====================
     
     @Test
