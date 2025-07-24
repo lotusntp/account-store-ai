@@ -618,19 +618,19 @@ public class OrderServiceImpl implements OrderService {
 
     private void validateOrderCreationInput(User user, Map<UUID, Integer> productQuantities) {
         if (user == null) {
-            throw new IllegalArgumentException("User cannot be null");
+            throw new InvalidOrderException("User cannot be null");
         }
         
         if (productQuantities == null || productQuantities.isEmpty()) {
-            throw new IllegalArgumentException("Product quantities cannot be null or empty");
+            throw new InvalidOrderException("Product quantities cannot be null or empty");
         }
         
         for (Map.Entry<UUID, Integer> entry : productQuantities.entrySet()) {
             if (entry.getKey() == null) {
-                throw new IllegalArgumentException("Product ID cannot be null");
+                throw new InvalidOrderException("Product ID cannot be null");
             }
             if (entry.getValue() == null || entry.getValue() <= 0) {
-                throw new IllegalArgumentException("Quantity must be positive for product: " + entry.getKey());
+                throw new InvalidOrderException("Quantity must be positive for product: " + entry.getKey());
             }
         }
     }

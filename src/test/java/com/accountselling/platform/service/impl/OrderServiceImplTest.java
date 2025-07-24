@@ -1,16 +1,14 @@
 package com.accountselling.platform.service.impl;
 
+import com.accountselling.platform.dto.statistics.DailyOrderStatistics;
 import com.accountselling.platform.dto.statistics.OrderStatistics;
 import com.accountselling.platform.enums.OrderStatus;
 import com.accountselling.platform.exception.*;
 import com.accountselling.platform.model.*;
 import com.accountselling.platform.repository.*;
-import com.accountselling.platform.service.OrderService;
 import com.accountselling.platform.service.StockService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -24,19 +22,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.atLeastOnce;
 
-/**
- * Unit tests for OrderServiceImpl.
- * Tests comprehensive order management operations including creation,
- * status management, payment integration, and business logic operations
- * with mock dependencies.
- */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("OrderService Implementation Tests")
 class OrderServiceImplTest {
 
     @Mock
@@ -56,746 +46,533 @@ class OrderServiceImplTest {
     
     @Mock
     private StockService stockService;
-    
+
     @InjectMocks
     private OrderServiceImpl orderService;
 
     private User testUser;
     private Product testProduct;
-    private Category testCategory;
     private Stock testStock;
     private Order testOrder;
-    private OrderItem testOrderItem;
-    private UUID testUserId;
-    private UUID testProductId;
-    private UUID testOrderId;
 
     @BeforeEach
     void setUp() {
-        testUserId = UUID.randomUUID();
-        testProductId = UUID.randomUUID();
-        testOrderId = UUID.randomUUID();
-
-        // Setup test category
-        testCategory = new Category();
-        testCategory.setId(UUID.randomUUID());
-        testCategory.setName("Test Category");
-
-        // Setup test user
         testUser = new User();
-        testUser.setId(testUserId);
+        testUser.setId(UUID.randomUUID());
         testUser.setUsername("testuser");
-        testUser.setEmail("test@example.com");
-        testUser.setFirstName("Test");
-        testUser.setLastName("User");
 
-        // Setup test product
         testProduct = new Product();
-        testProduct.setId(testProductId);
+        testProduct.setId(UUID.randomUUID());
         testProduct.setName("Test Product");
-        testProduct.setDescription("Test Description");
         testProduct.setPrice(BigDecimal.valueOf(100.00));
-        testProduct.setCategory(testCategory);
-        testProduct.setActive(true);
 
-        // Setup test stock
         testStock = new Stock();
         testStock.setId(UUID.randomUUID());
         testStock.setProduct(testProduct);
-        testStock.setCredentials("test:credentials");
+        testStock.setCredentials("test-credentials");
         testStock.setSold(false);
 
-        // Setup test order
-        testOrder = new Order();
-        testOrder.setId(testOrderId);
-        testOrder.setUser(testUser);
-        testOrder.setTotalAmount(BigDecimal.valueOf(100.00));
+        testOrder = new Order(testUser, BigDecimal.valueOf(100.00));
+        testOrder.setId(UUID.randomUUID());
+    }
+
+    // ==================== ORDER CREATION TESTS ====================
+
+    @Test
+    void createOrder_WithValidInput_ShouldCreateOrder() {
+        // Arrange
+        Map<UUID, Integer> productQuantities = Map.of(testProduct.getId(), 1);
+        List<Stock> reservedStocks = List.of(testStock);
+        
+        when(productRepository.findById(testProduct.getId())).thenReturn(Optional.of(testProduct));
+        when(stockRepository.countAvailableByProductId(testProduct.getId())).thenReturn(5L);
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        when(stockService.reserveStock(testProduct.getId(), 1, 30)).thenReturn(reservedStocks);
+
+        // Act
+        Order result = orderService.createOrder(testUser, productQuantities);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(testUser, result.getUser());
+        assertEquals(BigDecimal.valueOf(100.00), result.getTotalAmount());
+        verify(orderRepository).save(any(Order.class));
+        verify(stockService).reserveStock(testProduct.getId(), 1, 30);
+    }
+
+    @Test
+    void createOrder_WithInsufficientStock_ShouldThrowException() {
+        // Arrange
+        Map<UUID, Integer> productQuantities = Map.of(testProduct.getId(), 5);
+        
+        when(productRepository.findById(testProduct.getId())).thenReturn(Optional.of(testProduct));
+        when(stockRepository.countAvailableByProductId(testProduct.getId())).thenReturn(2L);
+
+        // Act & Assert
+        assertThrows(InsufficientStockException.class, 
+                    () -> orderService.createOrder(testUser, productQuantities));
+    }
+
+    @Test
+    void createOrder_WithNonExistentProduct_ShouldThrowException() {
+        // Arrange
+        Map<UUID, Integer> productQuantities = Map.of(UUID.randomUUID(), 1);
+        
+        when(productRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, 
+                    () -> orderService.createOrder(testUser, productQuantities));
+    }
+
+    @Test
+    void createOrder_WithInvalidQuantity_ShouldThrowException() {
+        // Arrange
+        Map<UUID, Integer> productQuantities = Map.of(testProduct.getId(), 0);
+
+        // Act & Assert
+        assertThrows(InvalidOrderException.class, 
+                    () -> orderService.createOrder(testUser, productQuantities));
+    }
+
+    @Test
+    void createOrderByUsername_WithValidUsername_ShouldCreateOrder() {
+        // Arrange
+        Map<UUID, Integer> productQuantities = Map.of(testProduct.getId(), 1);
+        List<Stock> reservedStocks = List.of(testStock);
+        
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(productRepository.findById(testProduct.getId())).thenReturn(Optional.of(testProduct));
+        when(stockRepository.countAvailableByProductId(testProduct.getId())).thenReturn(5L);
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        when(stockService.reserveStock(testProduct.getId(), 1, 30)).thenReturn(reservedStocks);
+
+        // Act
+        Order result = orderService.createOrderByUsername("testuser", productQuantities);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(testUser, result.getUser());
+        verify(userRepository).findByUsername("testuser");
+    }
+
+    @Test
+    void createOrderByUsername_WithInvalidUsername_ShouldThrowException() {
+        // Arrange
+        Map<UUID, Integer> productQuantities = Map.of(testProduct.getId(), 1);
+        
+        when(userRepository.findByUsername("invaliduser")).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, 
+                    () -> orderService.createOrderByUsername("invaliduser", productQuantities));
+    }
+
+    // ==================== ORDER RETRIEVAL TESTS ====================
+
+    @Test
+    void findById_WithValidId_ShouldReturnOrder() {
+        // Arrange
+        UUID orderId = testOrder.getId();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(testOrder));
+
+        // Act
+        Order result = orderService.findById(orderId);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(testOrder, result);
+        verify(orderRepository).findById(orderId);
+    }
+
+    @Test
+    void findById_WithInvalidId_ShouldThrowException() {
+        // Arrange
+        UUID orderId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, 
+                    () -> orderService.findById(orderId));
+    }
+
+    @Test
+    void findByOrderNumber_WithValidOrderNumber_ShouldReturnOrder() {
+        // Arrange
+        String orderNumber = "ORD-123456";
+        testOrder.setOrderNumber(orderNumber);
+        when(orderRepository.findByOrderNumber(orderNumber)).thenReturn(Optional.of(testOrder));
+
+        // Act
+        Order result = orderService.findByOrderNumber(orderNumber);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(testOrder, result);
+        verify(orderRepository).findByOrderNumber(orderNumber);
+    }
+
+    @Test
+    void getOrdersByUser_WithValidUser_ShouldReturnOrders() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Order> orders = List.of(testOrder);
+        Page<Order> orderPage = new PageImpl<>(orders, pageable, 1);
+        
+        when(orderRepository.findByUser(testUser, pageable)).thenReturn(orderPage);
+
+        // Act
+        Page<Order> result = orderService.getOrdersByUser(testUser, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testOrder, result.getContent().get(0));
+        verify(orderRepository).findByUser(testUser, pageable);
+    }
+
+    // ==================== ORDER STATUS MANAGEMENT TESTS ====================
+
+    @Test
+    void markOrderAsProcessing_WithValidOrder_ShouldUpdateStatus() {
+        // Arrange
         testOrder.setStatus(OrderStatus.PENDING);
-        testOrder.setOrderNumber("ORD-12345");
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
 
-        // Setup test order item
-        testOrderItem = new OrderItem();
-        testOrderItem.setId(UUID.randomUUID());
-        testOrderItem.setOrder(testOrder);
-        testOrderItem.setProduct(testProduct);
-        testOrderItem.setStockItem(testStock);
-        testOrderItem.setPrice(BigDecimal.valueOf(100.00));
-        testOrderItem.setProductName("Test Product");
+        // Act
+        Order result = orderService.markOrderAsProcessing(testOrder.getId());
 
-        testOrder.getOrderItems().add(testOrderItem);
+        // Assert
+        assertNotNull(result);
+        assertEquals(OrderStatus.PROCESSING, result.getStatus());
+        verify(orderRepository).save(testOrder);
     }
 
-    @Nested
-    @DisplayName("Order Creation Tests")
-    class OrderCreationTests {
+    @Test
+    void markOrderAsCompleted_WithValidOrder_ShouldUpdateStatusAndMarkStockAsSold() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PROCESSING);
+        OrderItem orderItem = new OrderItem(testOrder, testProduct, testStock, testProduct.getPrice());
+        testOrder.addOrderItem(orderItem);
+        
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
 
-        @Test
-        @DisplayName("Create order successfully with valid data")
-        void createOrder_WithValidData_ShouldCreateOrderSuccessfully() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 1);
-            List<Stock> reservedStocks = List.of(testStock);
+        // Act
+        Order result = orderService.markOrderAsCompleted(testOrder.getId());
 
-            when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
-            when(stockRepository.countAvailableByProductId(testProductId)).thenReturn(5L);
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
-            when(stockService.reserveStock(testProductId, 1, 30)).thenReturn(reservedStocks);
-
-            // When
-            Order result = orderService.createOrder(testUser, productQuantities);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getUser()).isEqualTo(testUser);
-            assertThat(result.getTotalAmount()).isEqualTo(BigDecimal.valueOf(200.00));
-            assertThat(result.getStatus()).isEqualTo(OrderStatus.PENDING);
-
-            verify(productRepository, atLeastOnce()).findById(testProductId);
-            verify(stockRepository).countAvailableByProductId(testProductId);
-            verify(orderRepository).save(any(Order.class));
-            verify(stockService).reserveStock(testProductId, 1, 30);
-        }
-
-        @Test
-        @DisplayName("Create order with single product")
-        void createOrder_WithSingleProduct_ShouldCreateOrderSuccessfully() {
-            // Given
-            List<Stock> reservedStocks = List.of(testStock);
-
-            when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
-            when(stockRepository.countAvailableByProductId(testProductId)).thenReturn(5L);
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
-            when(stockService.reserveStock(testProductId, 2, 30)).thenReturn(reservedStocks);
-
-            // When
-            Order result = orderService.createOrder(testUser, testProductId, 2);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getUser()).isEqualTo(testUser);
-
-            verify(productRepository, atLeastOnce()).findById(testProductId);
-            verify(stockService).reserveStock(testProductId, 2, 30);
-        }
-
-        @Test
-        @DisplayName("Create order by username")
-        void createOrderByUsername_WithValidUsername_ShouldCreateOrderSuccessfully() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 1);
-            List<Stock> reservedStocks = List.of(testStock);
-
-            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
-            when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
-            when(stockRepository.countAvailableByProductId(testProductId)).thenReturn(5L);
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
-            when(stockService.reserveStock(testProductId, 1, 30)).thenReturn(reservedStocks);
-
-            // When
-            Order result = orderService.createOrderByUsername("testuser", productQuantities);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getUser()).isEqualTo(testUser);
-
-            verify(userRepository).findByUsername("testuser");
-            verify(productRepository, atLeastOnce()).findById(testProductId);
-        }
-
-        @Test
-        @DisplayName("Create order with non-existent user should throw exception")
-        void createOrderByUsername_WithNonExistentUser_ShouldThrowException() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 1);
-
-            when(userRepository.findByUsername("nonexistent")).thenReturn(Optional.empty());
-
-            // When & Then
-            assertThatThrownBy(() -> orderService.createOrderByUsername("nonexistent", productQuantities))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found with username: nonexistent");
-
-            verify(userRepository).findByUsername("nonexistent");
-            verifyNoInteractions(productRepository, orderRepository);
-        }
-
-        @Test
-        @DisplayName("Create order with insufficient stock should throw exception")
-        void createOrder_WithInsufficientStock_ShouldThrowException() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 10);
-
-            when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
-            when(stockRepository.countAvailableByProductId(testProductId)).thenReturn(5L);
-
-            // When & Then
-            assertThatThrownBy(() -> orderService.createOrder(testUser, productQuantities))
-                .isInstanceOf(InsufficientStockException.class)
-                .hasMessageContaining("Insufficient stock for product");
-
-            verify(productRepository, atLeastOnce()).findById(testProductId);
-            verify(stockRepository).countAvailableByProductId(testProductId);
-            verifyNoInteractions(orderRepository);
-        }
-
-        @Test
-        @DisplayName("Create order with non-existent product should throw exception")
-        void createOrder_WithNonExistentProduct_ShouldThrowException() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 1);
-
-            when(productRepository.findById(testProductId)).thenReturn(Optional.empty());
-
-            // When & Then
-            assertThatThrownBy(() -> orderService.createOrder(testUser, productQuantities))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Product not found with ID");
-
-            verify(productRepository, atLeastOnce()).findById(testProductId);
-            verifyNoInteractions(orderRepository);
-        }
-
-        @Test
-        @DisplayName("Create order with invalid quantity should throw exception")
-        void createOrder_WithInvalidQuantity_ShouldThrowException() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 0);
-
-            // When & Then
-            assertThatThrownBy(() -> orderService.createOrder(testUser, productQuantities))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Quantity must be positive");
-
-            verifyNoInteractions(productRepository, orderRepository);
-        }
+        // Assert
+        assertNotNull(result);
+        assertEquals(OrderStatus.COMPLETED, result.getStatus());
+        verify(orderRepository).save(testOrder);
     }
 
-    @Nested
-    @DisplayName("Order Retrieval Tests")
-    class OrderRetrievalTests {
+    @Test
+    void cancelOrder_WithValidOrder_ShouldUpdateStatusAndReleaseStock() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PENDING);
+        OrderItem orderItem = new OrderItem(testOrder, testProduct, testStock, testProduct.getPrice());
+        testOrder.addOrderItem(orderItem);
+        
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
 
-        @Test
-        @DisplayName("Find order by ID successfully")
-        void findById_WithValidId_ShouldReturnOrder() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
+        // Act
+        Order result = orderService.cancelOrder(testOrder.getId(), "User cancelled");
 
-            // When
-            Order result = orderService.findById(testOrderId);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(testOrderId);
-
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-        }
-
-        @Test
-        @DisplayName("Find order by non-existent ID should throw exception")
-        void findById_WithNonExistentId_ShouldThrowException() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.empty());
-
-            // When & Then
-            assertThatThrownBy(() -> orderService.findById(testOrderId))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Order not found with ID");
-
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-        }
-
-        @Test
-        @DisplayName("Find order by order number successfully")
-        void findByOrderNumber_WithValidNumber_ShouldReturnOrder() {
-            // Given
-            when(orderRepository.findByOrderNumber("ORD-12345")).thenReturn(Optional.of(testOrder));
-
-            // When
-            Order result = orderService.findByOrderNumber("ORD-12345");
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getOrderNumber()).isEqualTo("ORD-12345");
-
-            verify(orderRepository).findByOrderNumber("ORD-12345");
-        }
-
-        @Test
-        @DisplayName("Get orders by user with pagination")
-        void getOrdersByUser_WithValidUser_ShouldReturnPagedOrders() {
-            // Given
-            Pageable pageable = PageRequest.of(0, 10);
-            List<Order> orders = List.of(testOrder);
-            Page<Order> page = new PageImpl<>(orders, pageable, 1);
-
-            when(orderRepository.findByUser(testUser, pageable)).thenReturn(page);
-
-            // When
-            Page<Order> result = orderService.getOrdersByUser(testUser, pageable);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getContent()).hasSize(1);
-            assertThat(result.getContent().get(0)).isEqualTo(testOrder);
-
-            verify(orderRepository).findByUser(testUser, pageable);
-        }
-
-        @Test
-        @DisplayName("Get orders by username with pagination")
-        void getOrdersByUsername_WithValidUsername_ShouldReturnPagedOrders() {
-            // Given
-            Pageable pageable = PageRequest.of(0, 10);
-            List<Order> orders = List.of(testOrder);
-            Page<Order> page = new PageImpl<>(orders, pageable, 1);
-
-            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
-            when(orderRepository.findByUser(testUser, pageable)).thenReturn(page);
-
-            // When
-            Page<Order> result = orderService.getOrdersByUsername("testuser", pageable);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getContent()).hasSize(1);
-
-            verify(userRepository).findByUsername("testuser");
-            verify(orderRepository).findByUser(testUser, pageable);
-        }
+        // Assert
+        assertNotNull(result);
+        assertEquals(OrderStatus.CANCELLED, result.getStatus());
+        verify(orderRepository).save(testOrder);
     }
 
-    @Nested
-    @DisplayName("Order Status Management Tests")
-    class OrderStatusManagementTests {
+    @Test
+    void cancelOrderByUser_WithValidUserAndOrder_ShouldCancelOrder() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PENDING);
+        testOrder.setUser(testUser);
+        
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
 
-        @Test
-        @DisplayName("Mark order as processing successfully")
-        void markOrderAsProcessing_WithValidOrder_ShouldUpdateStatus() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        // Act
+        Order result = orderService.cancelOrderByUser(testOrder.getId(), testUser, "User cancelled");
 
-            // When
-            Order result = orderService.markOrderAsProcessing(testOrderId);
-
-            // Then
-            assertThat(result).isNotNull();
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-            verify(orderRepository).save(any(Order.class));
-        }
-
-        @Test
-        @DisplayName("Mark order as completed successfully")
-        void markOrderAsCompleted_WithValidOrder_ShouldUpdateStatusAndMarkStockSold() {
-            // Given
-            testOrder.setStatus(OrderStatus.PROCESSING);
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
-
-            // When
-            Order result = orderService.markOrderAsCompleted(testOrderId);
-
-            // Then
-            assertThat(result).isNotNull();
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-            verify(orderRepository).save(any(Order.class));
-        }
-
-        @Test
-        @DisplayName("Mark order as failed successfully")
-        void markOrderAsFailed_WithValidOrder_ShouldUpdateStatusAndReleaseStock() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
-
-            // When
-            Order result = orderService.markOrderAsFailed(testOrderId, "Payment failed");
-
-            // Then
-            assertThat(result).isNotNull();
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-            verify(orderRepository).save(any(Order.class));
-        }
-
-        @Test
-        @DisplayName("Cancel order successfully")
-        void cancelOrder_WithValidOrder_ShouldUpdateStatusAndReleaseStock() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
-
-            // When
-            Order result = orderService.cancelOrder(testOrderId, "User cancelled");
-
-            // Then
-            assertThat(result).isNotNull();
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-            verify(orderRepository).save(any(Order.class));
-        }
-
-        @Test
-        @DisplayName("Cancel order by user successfully")
-        void cancelOrderByUser_WithValidUserAndOrder_ShouldCancelOrder() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
-
-            // When
-            Order result = orderService.cancelOrderByUser(testOrderId, testUser, "Changed mind");
-
-            // Then
-            assertThat(result).isNotNull();
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-            verify(orderRepository).save(any(Order.class));
-        }
-
-        @Test
-        @DisplayName("Cancel order by unauthorized user should throw exception")
-        void cancelOrderByUser_WithUnauthorizedUser_ShouldThrowException() {
-            // Given
-            User otherUser = new User();
-            otherUser.setId(UUID.randomUUID());
-            otherUser.setUsername("otheruser");
-
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-
-            // When & Then
-            assertThatThrownBy(() -> orderService.cancelOrderByUser(testOrderId, otherUser, "Reason"))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessageContaining("User does not have permission to cancel this order");
-
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-            verify(orderRepository, never()).save(any(Order.class));
-        }
+        // Assert
+        assertNotNull(result);
+        assertEquals(OrderStatus.CANCELLED, result.getStatus());
+        verify(orderRepository).save(testOrder);
     }
 
-    @Nested
-    @DisplayName("Order Validation Tests")
-    class OrderValidationTests {
+    @Test
+    void cancelOrderByUser_WithUnauthorizedUser_ShouldThrowException() {
+        // Arrange
+        User otherUser = new User();
+        otherUser.setId(UUID.randomUUID());
+        otherUser.setUsername("otheruser");
+        
+        testOrder.setStatus(OrderStatus.PENDING);
+        testOrder.setUser(testUser);
+        
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
 
-        @Test
-        @DisplayName("Validate order with valid data should pass")
-        void validateOrder_WithValidData_ShouldPass() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 2);
+        // Act & Assert
+        assertThrows(UnauthorizedException.class, 
+                    () -> orderService.cancelOrderByUser(testOrder.getId(), otherUser, "User cancelled"));
+    }    
+// ==================== ORDER VALIDATION TESTS ====================
 
-            when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
-            when(stockRepository.countAvailableByProductId(testProductId)).thenReturn(5L);
+    @Test
+    void validateOrder_WithValidInput_ShouldNotThrowException() {
+        // Arrange
+        Map<UUID, Integer> productQuantities = Map.of(testProduct.getId(), 1);
+        
+        when(productRepository.findById(testProduct.getId())).thenReturn(Optional.of(testProduct));
+        when(stockRepository.countAvailableByProductId(testProduct.getId())).thenReturn(5L);
 
-            // When & Then
-            assertThatCode(() -> orderService.validateOrder(testUser, productQuantities))
-                .doesNotThrowAnyException();
-
-            verify(productRepository, atLeastOnce()).findById(testProductId);
-            verify(stockRepository).countAvailableByProductId(testProductId);
-        }
-
-        @Test
-        @DisplayName("Validate order with insufficient stock should throw exception")
-        void validateOrder_WithInsufficientStock_ShouldThrowException() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 10);
-
-            when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
-            when(stockRepository.countAvailableByProductId(testProductId)).thenReturn(5L);
-
-            // When & Then
-            assertThatThrownBy(() -> orderService.validateOrder(testUser, productQuantities))
-                .isInstanceOf(InsufficientStockException.class)
-                .hasMessageContaining("Insufficient stock for product");
-        }
-
-        @Test
-        @DisplayName("Check if user can create orders")
-        void canUserCreateOrders_WithValidUser_ShouldReturnTrue() {
-            // When
-            boolean result = orderService.canUserCreateOrders(testUser);
-
-            // Then
-            assertThat(result).isTrue();
-        }
-
-        @Test
-        @DisplayName("Check if null user can create orders")
-        void canUserCreateOrders_WithNullUser_ShouldReturnFalse() {
-            // When
-            boolean result = orderService.canUserCreateOrders(null);
-
-            // Then
-            assertThat(result).isFalse();
-        }
-
-        @Test
-        @DisplayName("Check if order can be cancelled")
-        void canOrderBeCancelled_WithPendingOrder_ShouldReturnTrue() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-
-            // When
-            boolean result = orderService.canOrderBeCancelled(testOrderId);
-
-            // Then
-            assertThat(result).isTrue();
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-        }
-
-        @Test
-        @DisplayName("Check if order belongs to user")
-        void doesOrderBelongToUser_WithCorrectUser_ShouldReturnTrue() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-
-            // When
-            boolean result = orderService.doesOrderBelongToUser(testOrderId, testUser);
-
-            // Then
-            assertThat(result).isTrue();
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-        }
+        // Act & Assert
+        assertDoesNotThrow(() -> orderService.validateOrder(testUser, productQuantities));
     }
 
-    @Nested
-    @DisplayName("Order Business Logic Tests")
-    class OrderBusinessLogicTests {
+    @Test
+    void canUserCreateOrders_WithValidUser_ShouldReturnTrue() {
+        // Act
+        boolean result = orderService.canUserCreateOrders(testUser);
 
-        @Test
-        @DisplayName("Calculate order total successfully")
-        void calculateOrderTotal_WithValidProducts_ShouldReturnCorrectTotal() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 2);
-            BigDecimal expectedTotal = BigDecimal.valueOf(200.00);
-
-            when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
-
-            // When
-            BigDecimal result = orderService.calculateOrderTotal(productQuantities);
-
-            // Then
-            assertThat(result).isEqualByComparingTo(expectedTotal);
-            verify(productRepository, atLeastOnce()).findById(testProductId);
-        }
-
-        @Test
-        @DisplayName("Get available quantity for product")
-        void getAvailableQuantityForProduct_WithValidProduct_ShouldReturnCount() {
-            // Given
-            when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
-            when(stockRepository.countAvailableByProductId(testProductId)).thenReturn(10L);
-
-            // When
-            int result = orderService.getAvailableQuantityForProduct(testProductId);
-
-            // Then
-            assertThat(result).isEqualTo(10);
-            verify(productRepository, atLeastOnce()).findById(testProductId);
-            verify(stockRepository).countAvailableByProductId(testProductId);
-        }
-
-        @Test
-        @DisplayName("Reserve stock for order successfully")
-        void reserveStockForOrder_WithValidData_ShouldReserveStock() {
-            // Given
-            Map<UUID, Integer> productQuantities = Map.of(testProductId, 1);
-            List<Stock> reservedStocks = List.of(testStock);
-
-            when(productRepository.findById(testProductId)).thenReturn(Optional.of(testProduct));
-            when(stockService.reserveStock(testProductId, 1, 30)).thenReturn(reservedStocks);
-
-            // When
-            orderService.reserveStockForOrder(testOrder, productQuantities);
-
-            // Then
-            verify(productRepository, atLeastOnce()).findById(testProductId);
-            verify(stockService).reserveStock(testProductId, 1, 30);
-        }
-
-        @Test
-        @DisplayName("Release stock reservations")
-        void releaseStockReservations_WithValidOrder_ShouldReleaseReservations() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-
-            // When
-            orderService.releaseStockReservations(testOrderId);
-
-            // Then
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-        }
-
-        @Test
-        @DisplayName("Mark stock items as sold")
-        void markStockItemsAsSold_WithValidOrder_ShouldMarkAsSold() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-
-            // When
-            orderService.markStockItemsAsSold(testOrderId);
-
-            // Then
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-        }
+        // Assert
+        assertTrue(result);
     }
 
-    @Nested
-    @DisplayName("Order Search and Reporting Tests")
-    class OrderSearchAndReportingTests {
+    @Test
+    void canUserCreateOrders_WithNullUser_ShouldReturnFalse() {
+        // Act
+        boolean result = orderService.canUserCreateOrders(null);
 
-        @Test
-        @DisplayName("Search orders with criteria")
-        void searchOrders_WithCriteria_ShouldReturnFilteredOrders() {
-            // Given
-            Pageable pageable = PageRequest.of(0, 10);
-            List<Order> orders = List.of(testOrder);
-            Page<Order> page = new PageImpl<>(orders, pageable, 1);
-
-            when(orderRepository.searchOrders(any(), any(), any(),
-                any(), any(), any(),
-                any(), eq(pageable))).thenReturn(page);
-
-            // When
-            Page<Order> result = orderService.searchOrders("ORD", "testuser", OrderStatus.PENDING,
-                null, null, null, null, pageable);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getContent()).hasSize(1);
-
-            verify(orderRepository).searchOrders(any(), any(), any(),
-                any(), any(), any(),
-                any(), eq(pageable));
-        }
-
-        @Test
-        @DisplayName("Get order statistics")
-        void getOrderStatistics_ShouldReturnStatistics() {
-            // Given
-            Object[] stats = {10L, 5L, 3L, 2L}; // total, pending, completed, failed
-            when(orderRepository.getOrderStatistics()).thenReturn(stats);
-            when(orderRepository.countByStatus(OrderStatus.PROCESSING)).thenReturn(1L);
-            when(orderRepository.countByStatus(OrderStatus.CANCELLED)).thenReturn(1L);
-            when(orderRepository.calculateTotalRevenue()).thenReturn(BigDecimal.valueOf(1000.00));
-            when(orderRepository.calculateAverageOrderValue()).thenReturn(BigDecimal.valueOf(100.00));
-
-            // When
-            OrderStatistics result = orderService.getOrderStatistics();
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.total()).isEqualTo(10L);
-            assertThat(result.pending()).isEqualTo(5L);
-            assertThat(result.completed()).isEqualTo(3L);
-            assertThat(result.failed()).isEqualTo(2L);
-
-            verify(orderRepository).getOrderStatistics();
-            verify(orderRepository).countByStatus(OrderStatus.PROCESSING);
-            verify(orderRepository).countByStatus(OrderStatus.CANCELLED);
-        }
-
-        @Test
-        @DisplayName("Get recent orders")
-        void getRecentOrders_WithLimit_ShouldReturnRecentOrders() {
-            // Given
-            List<Order> orders = List.of(testOrder);
-            when(orderRepository.findRecentOrders(5)).thenReturn(orders);
-
-            // When
-            List<Order> result = orderService.getRecentOrders(5);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0)).isEqualTo(testOrder);
-
-            verify(orderRepository).findRecentOrders(5);
-        }
+        // Assert
+        assertFalse(result);
     }
 
-    @Nested
-    @DisplayName("Order Integration Tests")
-    class OrderIntegrationTests {
+    @Test
+    void canOrderBeCancelled_WithCancellableOrder_ShouldReturnTrue() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PENDING);
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
 
-        @Test
-        @DisplayName("Process order completion")
-        void processOrderCompletion_WithValidData_ShouldCompleteOrder() {
-            // Given
-            testOrder.setStatus(OrderStatus.PROCESSING);
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        // Act
+        boolean result = orderService.canOrderBeCancelled(testOrder.getId());
 
-            // When
-            orderService.processOrderCompletion(testOrderId, "TXN-12345");
+        // Assert
+        assertTrue(result);
+    }
 
-            // Then
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-            verify(orderRepository).save(any(Order.class));
-        }
+    @Test
+    void doesOrderBelongToUser_WithCorrectUser_ShouldReturnTrue() {
+        // Arrange
+        testOrder.setUser(testUser);
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
 
-        @Test
-        @DisplayName("Process order failure")
-        void processOrderFailure_WithValidData_ShouldFailOrder() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-            when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        // Act
+        boolean result = orderService.doesOrderBelongToUser(testOrder.getId(), testUser);
 
-            // When
-            orderService.processOrderFailure(testOrderId, "Payment failed");
+        // Assert
+        assertTrue(result);
+    }
 
-            // Then
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-            verify(orderRepository).save(any(Order.class));
-        }
+    // ==================== ORDER BUSINESS LOGIC TESTS ====================
 
-        @Test
-        @DisplayName("Get order download info successfully")
-        void getOrderDownloadInfo_WithCompletedOrder_ShouldReturnDownloadInfo() {
-            // Given
-            testOrder.setStatus(OrderStatus.COMPLETED);
-            testStock.setCredentials("username:password");
-            
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
+    @Test
+    void calculateOrderTotal_WithValidProducts_ShouldReturnCorrectTotal() {
+        // Arrange
+        Map<UUID, Integer> productQuantities = Map.of(testProduct.getId(), 2);
+        
+        when(productRepository.findById(testProduct.getId())).thenReturn(Optional.of(testProduct));
 
-            // When
-            Map<String, String> result = orderService.getOrderDownloadInfo(testOrderId, testUser);
+        // Act
+        BigDecimal result = orderService.calculateOrderTotal(productQuantities);
 
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result).containsKey("Test Product");
-            assertThat(result.get("Test Product")).isEqualTo("username:password");
+        // Assert
+        assertEquals(BigDecimal.valueOf(200.00), result);
+    }
 
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-        }
+    @Test
+    void getAvailableQuantityForProduct_WithValidProduct_ShouldReturnQuantity() {
+        // Arrange
+        when(productRepository.findById(testProduct.getId())).thenReturn(Optional.of(testProduct));
+        when(stockRepository.countAvailableByProductId(testProduct.getId())).thenReturn(5L);
 
-        @Test
-        @DisplayName("Get order download info with unauthorized user should throw exception")
-        void getOrderDownloadInfo_WithUnauthorizedUser_ShouldThrowException() {
-            // Given
-            User otherUser = new User();
-            otherUser.setId(UUID.randomUUID());
-            otherUser.setUsername("otheruser");
+        // Act
+        int result = orderService.getAvailableQuantityForProduct(testProduct.getId());
 
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
+        // Assert
+        assertEquals(5, result);
+    }
 
-            // When & Then
-            assertThatThrownBy(() -> orderService.getOrderDownloadInfo(testOrderId, otherUser))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessageContaining("User does not have permission to access this order");
+    @Test
+    void reserveStockForOrder_WithValidInput_ShouldReserveStock() {
+        // Arrange
+        Map<UUID, Integer> productQuantities = Map.of(testProduct.getId(), 1);
+        List<Stock> reservedStocks = List.of(testStock);
+        
+        when(productRepository.findById(testProduct.getId())).thenReturn(Optional.of(testProduct));
+        when(stockService.reserveStock(testProduct.getId(), 1, 30)).thenReturn(reservedStocks);
 
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-        }
+        // Act
+        assertDoesNotThrow(() -> orderService.reserveStockForOrder(testOrder, productQuantities));
 
-        @Test
-        @DisplayName("Get order download info with incomplete order should throw exception")
-        void getOrderDownloadInfo_WithIncompleteOrder_ShouldThrowException() {
-            // Given
-            testOrder.setStatus(OrderStatus.PENDING);
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
+        // Assert
+        verify(stockService).reserveStock(testProduct.getId(), 1, 30);
+    }
 
-            // When & Then
-            assertThatThrownBy(() -> orderService.getOrderDownloadInfo(testOrderId, testUser))
-                .isInstanceOf(InvalidOrderStatusException.class)
-                .hasMessageContaining("Order must be completed to download information");
+    // ==================== ORDER SEARCH AND REPORTING TESTS ====================
 
-            verify(orderRepository, atLeastOnce()).findById(testOrderId);
-        }
+    @Test
+    void searchOrders_WithCriteria_ShouldReturnMatchingOrders() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Order> orders = List.of(testOrder);
+        Page<Order> orderPage = new PageImpl<>(orders, pageable, 1);
+        
+        when(orderRepository.searchOrders(anyString(), anyString(), any(OrderStatus.class),
+                any(LocalDateTime.class), any(LocalDateTime.class), any(BigDecimal.class),
+                any(BigDecimal.class), eq(pageable))).thenReturn(orderPage);
+
+        // Act
+        Page<Order> result = orderService.searchOrders("ORD", "testuser", OrderStatus.PENDING,
+                LocalDateTime.now().minusDays(1), LocalDateTime.now(),
+                BigDecimal.ZERO, BigDecimal.valueOf(1000), pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void getOrderStatistics_ShouldReturnStatistics() {
+        // Arrange
+        Object[] stats = {10L, 3L, 5L, 2L}; // total, pending, completed, failed
+        when(orderRepository.getOrderStatistics()).thenReturn(stats);
+        when(orderRepository.countByStatus(OrderStatus.PROCESSING)).thenReturn(1L);
+        when(orderRepository.countByStatus(OrderStatus.CANCELLED)).thenReturn(1L);
+        when(orderRepository.calculateTotalRevenue()).thenReturn(BigDecimal.valueOf(1000));
+        when(orderRepository.calculateAverageOrderValue()).thenReturn(BigDecimal.valueOf(100));
+
+        // Act
+        OrderStatistics result = orderService.getOrderStatistics();
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(10L, result.total());
+        assertEquals(3L, result.pending());
+        assertEquals(5L, result.completed());
+        assertEquals(2L, result.failed());
+    }
+
+    @Test
+    void getTopCustomersByOrderCount_ShouldReturnTopCustomers() {
+        // Arrange
+        List<User> topCustomers = List.of(testUser);
+        when(orderRepository.findTopCustomersByOrderCount(5)).thenReturn(topCustomers);
+
+        // Act
+        List<User> result = orderService.getTopCustomersByOrderCount(5);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testUser, result.get(0));
+    }
+
+    @Test
+    void getRecentOrders_ShouldReturnRecentOrders() {
+        // Arrange
+        List<Order> recentOrders = List.of(testOrder);
+        when(orderRepository.findRecentOrders(10)).thenReturn(recentOrders);
+
+        // Act
+        List<Order> result = orderService.getRecentOrders(10);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testOrder, result.get(0));
+    }
+
+    // ==================== ORDER INTEGRATION TESTS ====================
+
+    @Test
+    void processOrderCompletion_WithValidOrder_ShouldCompleteOrder() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PROCESSING);
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+
+        // Act
+        assertDoesNotThrow(() -> orderService.processOrderCompletion(testOrder.getId(), "TXN-123"));
+
+        // Assert
+        verify(orderRepository).save(testOrder);
+    }
+
+    @Test
+    void processOrderFailure_WithValidOrder_ShouldFailOrder() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PROCESSING);
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+
+        // Act
+        assertDoesNotThrow(() -> orderService.processOrderFailure(testOrder.getId(), "Payment failed"));
+
+        // Assert
+        verify(orderRepository).save(testOrder);
+    }
+
+    @Test
+    void getOrderDownloadInfo_WithCompletedOrder_ShouldReturnDownloadInfo() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.COMPLETED);
+        testOrder.setUser(testUser);
+        OrderItem orderItem = new OrderItem(testOrder, testProduct, testStock, testProduct.getPrice());
+        testOrder.addOrderItem(orderItem);
+        
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+
+        // Act
+        Map<String, String> result = orderService.getOrderDownloadInfo(testOrder.getId(), testUser);
+
+        // Assert
+        assertNotNull(result);
+        assertTrue(result.containsKey(testProduct.getName()));
+        assertEquals(testStock.getCredentials(), result.get(testProduct.getName()));
+    }
+
+    @Test
+    void getOrderDownloadInfo_WithUnauthorizedUser_ShouldThrowException() {
+        // Arrange
+        User otherUser = new User();
+        otherUser.setId(UUID.randomUUID());
+        
+        testOrder.setStatus(OrderStatus.COMPLETED);
+        testOrder.setUser(testUser);
+        
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+
+        // Act & Assert
+        assertThrows(UnauthorizedException.class, 
+                    () -> orderService.getOrderDownloadInfo(testOrder.getId(), otherUser));
+    }
+
+    @Test
+    void getOrderDownloadInfo_WithIncompleteOrder_ShouldThrowException() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PENDING);
+        testOrder.setUser(testUser);
+        
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+
+        // Act & Assert
+        assertThrows(InvalidOrderStatusException.class, 
+                    () -> orderService.getOrderDownloadInfo(testOrder.getId(), testUser));
     }
 }

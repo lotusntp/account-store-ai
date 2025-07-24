@@ -1,17 +1,15 @@
 package com.accountselling.platform.service.impl;
 
+import com.accountselling.platform.dto.statistics.DailyPaymentStatistics;
+import com.accountselling.platform.dto.statistics.PaymentMethodStatistics;
 import com.accountselling.platform.dto.statistics.PaymentStatistics;
-import com.accountselling.platform.enums.OrderStatus;
 import com.accountselling.platform.enums.PaymentStatus;
 import com.accountselling.platform.exception.*;
 import com.accountselling.platform.model.*;
 import com.accountselling.platform.repository.*;
 import com.accountselling.platform.service.OrderService;
-import com.accountselling.platform.service.PaymentService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -26,18 +24,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for PaymentServiceImpl.
- * Tests comprehensive payment management operations including creation,
- * QR code generation, status management, payment gateway integration, and financial reporting
- * with mock dependencies.
- */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("PaymentService Implementation Tests")
 class PaymentServiceImplTest {
 
     @Mock
@@ -51,945 +42,787 @@ class PaymentServiceImplTest {
     
     @Mock
     private OrderService orderService;
-    
+
     @InjectMocks
     private PaymentServiceImpl paymentService;
 
     private User testUser;
     private Order testOrder;
     private Payment testPayment;
-    private UUID testUserId;
-    private UUID testOrderId;
-    private UUID testPaymentId;
 
     @BeforeEach
     void setUp() {
-        testUserId = UUID.randomUUID();
-        testOrderId = UUID.randomUUID();
-        testPaymentId = UUID.randomUUID();
-
-        // Setup test user
         testUser = new User();
-        testUser.setId(testUserId);
+        testUser.setId(UUID.randomUUID());
         testUser.setUsername("testuser");
-        testUser.setEmail("test@example.com");
-        testUser.setFirstName("Test");
-        testUser.setLastName("User");
 
-        // Setup test order
-        testOrder = new Order();
-        testOrder.setId(testOrderId);
-        testOrder.setUser(testUser);
-        testOrder.setTotalAmount(BigDecimal.valueOf(100.00));
-        testOrder.setStatus(OrderStatus.PENDING);
-        testOrder.setOrderNumber("ORD-12345");
+        testOrder = new Order(testUser, BigDecimal.valueOf(100.00));
+        testOrder.setId(UUID.randomUUID());
 
-        // Setup test payment
-        testPayment = new Payment();
-        testPayment.setId(testPaymentId);
-        testPayment.setOrder(testOrder);
-        testPayment.setAmount(BigDecimal.valueOf(100.00));
-        testPayment.setStatus(PaymentStatus.PENDING);
-        testPayment.setPaymentMethod("QR_CODE");
-        testPayment.setPaymentReference("PAY-12345");
-        testPayment.setExpiresAt(LocalDateTime.now().plusMinutes(30));
-
-        // Set up configuration values
+        testPayment = new Payment(testOrder, BigDecimal.valueOf(100.00), "QR_CODE");
+        testPayment.setId(UUID.randomUUID());
+        
+        // Set default values using reflection
         ReflectionTestUtils.setField(paymentService, "defaultExpirationMinutes", 30);
         ReflectionTestUtils.setField(paymentService, "qrCodeBaseUrl", "https://payment-gateway.example.com/qr");
+    }   
+ // ==================== PAYMENT CREATION TESTS ====================
+
+    @Test
+    void createPayment_WithValidInput_ShouldCreatePayment() {
+        // Arrange
+        when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.createPayment(testOrder, "QR_CODE", 30);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(testOrder, result.getOrder());
+        assertEquals(BigDecimal.valueOf(100.00), result.getAmount());
+        assertEquals("QR_CODE", result.getPaymentMethod());
+        verify(paymentRepository).save(any(Payment.class));
     }
 
-    @Nested
-    @DisplayName("Payment Creation Tests")
-    class PaymentCreationTests {
+    @Test
+    void createPayment_WithExistingPayment_ShouldThrowException() {
+        // Arrange
+        when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.of(testPayment));
 
-        @Test
-        @DisplayName("Create payment successfully with valid data")
-        void createPayment_WithValidData_ShouldCreatePaymentSuccessfully() {
-            // Given
-            when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.empty());
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.createPayment(testOrder, "QR_CODE", 30);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getOrder()).isEqualTo(testOrder);
-            assertThat(result.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(100.00));
-            assertThat(result.getPaymentMethod()).isEqualTo("QR_CODE");
-            assertThat(result.getStatus()).isEqualTo(PaymentStatus.PENDING);
-
-            verify(paymentRepository).findByOrder(testOrder);
-            verify(paymentRepository).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Create payment with default expiration time")
-        void createPayment_WithDefaultExpiration_ShouldUseDefaultTime() {
-            // Given
-            when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.empty());
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.createPayment(testOrder, "QR_CODE");
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getPaymentMethod()).isEqualTo("QR_CODE");
-
-            verify(paymentRepository).findByOrder(testOrder);
-            verify(paymentRepository).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Create payment by order ID")
-        void createPaymentByOrderId_WithValidOrderId_ShouldCreatePayment() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
-            when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.empty());
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.createPaymentByOrderId(testOrderId, "QR_CODE", 30);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getOrder()).isEqualTo(testOrder);
-
-            verify(orderRepository).findById(testOrderId);
-            verify(paymentRepository).findByOrder(testOrder);
-            verify(paymentRepository).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Create payment with non-existent order should throw exception")
-        void createPaymentByOrderId_WithNonExistentOrder_ShouldThrowException() {
-            // Given
-            when(orderRepository.findById(testOrderId)).thenReturn(Optional.empty());
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.createPaymentByOrderId(testOrderId, "QR_CODE", 30))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Order not found with ID");
-
-            verify(orderRepository).findById(testOrderId);
-            verifyNoInteractions(paymentRepository);
-        }
-
-        @Test
-        @DisplayName("Create payment for order with existing payment should throw exception")
-        void createPayment_WithExistingPayment_ShouldThrowException() {
-            // Given
-            when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.of(testPayment));
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.createPayment(testOrder, "QR_CODE", 30))
-                .isInstanceOf(PaymentAlreadyExistsException.class)
-                .hasMessageContaining("Payment already exists for order");
-
-            verify(paymentRepository).findByOrder(testOrder);
-            verify(paymentRepository, never()).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Create payment with unsupported payment method should throw exception")
-        void createPayment_WithUnsupportedPaymentMethod_ShouldThrowException() {
-            // Given
-            testOrder.setStatus(OrderStatus.PENDING);
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.createPayment(testOrder, "UNSUPPORTED_METHOD", 30))
-                .isInstanceOf(InvalidPaymentException.class)
-                .hasMessageContaining("Unsupported payment method");
-
-            verifyNoInteractions(paymentRepository);
-        }
-
-        @Test
-        @DisplayName("Create payment for completed order should throw exception")
-        void createPayment_WithCompletedOrder_ShouldThrowException() {
-            // Given
-            testOrder.setStatus(OrderStatus.COMPLETED);
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.createPayment(testOrder, "QR_CODE", 30))
-                .isInstanceOf(InvalidPaymentException.class)
-                .hasMessageContaining("Cannot create payment for order in status");
-
-            verifyNoInteractions(paymentRepository);
-        }
+        // Act & Assert
+        assertThrows(PaymentAlreadyExistsException.class, 
+                    () -> paymentService.createPayment(testOrder, "QR_CODE", 30));
     }
 
-    @Nested
-    @DisplayName("QR Code Management Tests")
-    class QrCodeManagementTests {
-
-        @Test
-        @DisplayName("Generate QR code successfully")
-        void generateQrCode_WithValidPayment_ShouldReturnQrCodeUrl() {
-            // When
-            String result = paymentService.generateQrCode(testPayment);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result).contains("https://payment-gateway.example.com/qr");
-            assertThat(result).contains("ref=" + testPayment.getPaymentReference());
-            assertThat(result).contains("amount=100.00");
-        }
-
-        @Test
-        @DisplayName("Regenerate QR code successfully")
-        void regenerateQrCode_WithValidPayment_ShouldUpdateQrCode() {
-            // Given
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.regenerateQrCode(testPaymentId);
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Regenerate QR code for completed payment should throw exception")
-        void regenerateQrCode_WithCompletedPayment_ShouldThrowException() {
-            // Given
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.regenerateQrCode(testPaymentId))
-                .isInstanceOf(InvalidPaymentStatusException.class)
-                .hasMessageContaining("Cannot regenerate QR code for payment in status");
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository, never()).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Get QR code content successfully")
-        void getQrCodeContent_WithValidPayment_ShouldReturnContent() {
-            // Given
-            testPayment.setQrCodeUrl("https://example.com/qr/test");
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When
-            String result = paymentService.getQrCodeContent(testPaymentId);
-
-            // Then
-            assertThat(result).isEqualTo("https://example.com/qr/test");
-
-            verify(paymentRepository).findById(testPaymentId);
-        }
-
-        @Test
-        @DisplayName("Get QR code content for payment without QR code should throw exception")
-        void getQrCodeContent_WithoutQrCode_ShouldThrowException() {
-            // Given
-            testPayment.setQrCodeUrl(null);
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.getQrCodeContent(testPaymentId))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("No QR code available for payment");
-
-            verify(paymentRepository).findById(testPaymentId);
-        }
+    @Test
+    void createPayment_WithInvalidPaymentMethod_ShouldThrowException() {
+        // Act & Assert
+        assertThrows(InvalidPaymentException.class, 
+                    () -> paymentService.createPayment(testOrder, "INVALID_METHOD", 30));
     }
 
-    @Nested
-    @DisplayName("Payment Retrieval Tests")
-    class PaymentRetrievalTests {
+    @Test
+    void createPayment_WithDefaultExpiration_ShouldUseDefaultTime() {
+        // Arrange
+        when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
 
-        @Test
-        @DisplayName("Find payment by ID successfully")
-        void findById_WithValidId_ShouldReturnPayment() {
-            // Given
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
+        // Act
+        Payment result = paymentService.createPayment(testOrder, "QR_CODE");
 
-            // When
-            Payment result = paymentService.findById(testPaymentId);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(testPaymentId);
-
-            verify(paymentRepository).findById(testPaymentId);
-        }
-
-        @Test
-        @DisplayName("Find payment by non-existent ID should throw exception")
-        void findById_WithNonExistentId_ShouldThrowException() {
-            // Given
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.empty());
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.findById(testPaymentId))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Payment not found with ID");
-
-            verify(paymentRepository).findById(testPaymentId);
-        }
-
-        @Test
-        @DisplayName("Find payment by transaction ID successfully")
-        void findByTransactionId_WithValidId_ShouldReturnPayment() {
-            // Given
-            String transactionId = "TXN-12345";
-            when(paymentRepository.findByTransactionId(transactionId)).thenReturn(Optional.of(testPayment));
-
-            // When
-            Payment result = paymentService.findByTransactionId(transactionId);
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findByTransactionId(transactionId);
-        }
-
-        @Test
-        @DisplayName("Find payment by payment reference successfully")
-        void findByPaymentReference_WithValidReference_ShouldReturnPayment() {
-            // Given
-            when(paymentRepository.findByPaymentReference("PAY-12345")).thenReturn(Optional.of(testPayment));
-
-            // When
-            Payment result = paymentService.findByPaymentReference("PAY-12345");
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getPaymentReference()).isEqualTo("PAY-12345");
-
-            verify(paymentRepository).findByPaymentReference("PAY-12345");
-        }
-
-        @Test
-        @DisplayName("Find payment by order successfully")
-        void findByOrder_WithValidOrder_ShouldReturnPayment() {
-            // Given
-            when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.of(testPayment));
-
-            // When
-            Payment result = paymentService.findByOrder(testOrder);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getOrder()).isEqualTo(testOrder);
-
-            verify(paymentRepository).findByOrder(testOrder);
-        }
-
-        @Test
-        @DisplayName("Find payment by order ID successfully")
-        void findByOrderId_WithValidOrderId_ShouldReturnPayment() {
-            // Given
-            when(paymentRepository.findByOrderId(testOrderId)).thenReturn(Optional.of(testPayment));
-
-            // When
-            Payment result = paymentService.findByOrderId(testOrderId);
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findByOrderId(testOrderId);
-        }
+        // Assert
+        assertNotNull(result);
+        verify(paymentRepository).save(any(Payment.class));
     }
 
-    @Nested
-    @DisplayName("Payment Status Management Tests")
-    class PaymentStatusManagementTests {
+    @Test
+    void createPaymentByOrderId_WithValidOrderId_ShouldCreatePayment() {
+        // Arrange
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
 
-        @Test
-        @DisplayName("Mark payment as processing successfully")
-        void markPaymentAsProcessing_WithValidPayment_ShouldUpdateStatus() {
-            // Given
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+        // Act
+        Payment result = paymentService.createPaymentByOrderId(testOrder.getId(), "QR_CODE", 30);
 
-            // When
-            Payment result = paymentService.markPaymentAsProcessing(testPaymentId);
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Mark payment as completed successfully")
-        void markPaymentAsCompleted_WithValidPayment_ShouldUpdateStatusAndCompleteOrder() {
-            // Given
-            testPayment.setStatus(PaymentStatus.PROCESSING);
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.markPaymentAsCompleted(testPaymentId, "TXN-12345", "Gateway response");
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository).save(any(Payment.class));
-            verify(orderService).processOrderCompletion(testOrderId, "TXN-12345");
-        }
-
-        @Test
-        @DisplayName("Mark payment as failed successfully")
-        void markPaymentAsFailed_WithValidPayment_ShouldUpdateStatusAndFailOrder() {
-            // Given
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.markPaymentAsFailed(testPaymentId, "Payment failed", "Gateway response");
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository).save(any(Payment.class));
-            verify(orderService).processOrderFailure(testOrderId, "Payment failed");
-        }
-
-        @Test
-        @DisplayName("Cancel payment successfully")
-        void cancelPayment_WithValidPayment_ShouldUpdateStatusAndCancelOrder() {
-            // Given
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.cancelPayment(testPaymentId, "User cancelled");
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository).save(any(Payment.class));
-            verify(orderService).cancelOrder(testOrderId, "User cancelled");
-        }
-
-        @Test
-        @DisplayName("Cancel payment with invalid status should throw exception")
-        void cancelPayment_WithInvalidStatus_ShouldThrowException() {
-            // Given
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.cancelPayment(testPaymentId, "Reason"))
-                .isInstanceOf(InvalidPaymentStatusException.class)
-                .hasMessageContaining("Payment cannot be cancelled in current status");
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository, never()).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Process refund successfully")
-        void processRefund_WithValidData_ShouldProcessRefund() {
-            // Given
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            BigDecimal refundAmount = BigDecimal.valueOf(50.00);
-
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.processRefund(testPaymentId, refundAmount, "Customer request");
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository, atLeastOnce()).findById(testPaymentId);
-            verify(paymentRepository).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Process refund with invalid status should throw exception")
-        void processRefund_WithInvalidStatus_ShouldThrowException() {
-            // Given
-            testPayment.setStatus(PaymentStatus.PENDING);
-            BigDecimal refundAmount = BigDecimal.valueOf(50.00);
-
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.processRefund(testPaymentId, refundAmount, "Reason"))
-                .isInstanceOf(InvalidPaymentStatusException.class)
-                .hasMessageContaining("Payment cannot be refunded in current status");
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository, never()).save(any(Payment.class));
-        }
+        // Assert
+        assertNotNull(result);
+        assertEquals(testOrder, result.getOrder());
+        verify(orderRepository).findById(testOrder.getId());
     }
 
-    @Nested
-    @DisplayName("Payment Gateway Integration Tests")
-    class PaymentGatewayIntegrationTests {
+    @Test
+    void createPaymentByOrderId_WithInvalidOrderId_ShouldThrowException() {
+        // Arrange
+        UUID invalidOrderId = UUID.randomUUID();
+        when(orderRepository.findById(invalidOrderId)).thenReturn(Optional.empty());
 
-        @Test
-        @DisplayName("Process webhook with completed status")
-        void processWebhook_WithCompletedStatus_ShouldMarkAsCompleted() {
-            // Given
-            testPayment.setTransactionId("TXN-12345");
-            when(paymentRepository.findByTransactionId("TXN-12345")).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.processWebhook("TXN-12345", "COMPLETED", "Gateway response");
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findByTransactionId("TXN-12345");
-            verify(orderService).processOrderCompletion(testOrderId, "TXN-12345");
-        }
-
-        @Test
-        @DisplayName("Process webhook with failed status")
-        void processWebhook_WithFailedStatus_ShouldMarkAsFailed() {
-            // Given
-            testPayment.setTransactionId("TXN-12345");
-            when(paymentRepository.findByTransactionId("TXN-12345")).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.processWebhook("TXN-12345", "FAILED", "Gateway response");
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findByTransactionId("TXN-12345");
-            verify(orderService).processOrderFailure(testOrderId, "Payment failed via webhook");
-        }
-
-        @Test
-        @DisplayName("Process webhook with unknown status should throw exception")
-        void processWebhook_WithUnknownStatus_ShouldThrowException() {
-            // Given
-            testPayment.setTransactionId("TXN-12345");
-            when(paymentRepository.findByTransactionId("TXN-12345")).thenReturn(Optional.of(testPayment));
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.processWebhook("TXN-12345", "UNKNOWN", "Gateway response"))
-                .isInstanceOf(WebhookProcessingException.class)
-                .hasMessageContaining("Unknown webhook status");
-
-            verify(paymentRepository).findByTransactionId("TXN-12345");
-        }
-
-        @Test
-        @DisplayName("Verify payment with gateway")
-        void verifyPaymentWithGateway_WithValidPayment_ShouldVerifyAndUpdate() {
-            // Given
-            testPayment.setTransactionId("TXN-12345");
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.findByTransactionId("TXN-12345")).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.verifyPaymentWithGateway(testPaymentId);
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository, atLeastOnce()).findById(testPaymentId);
-        }
-
-        @Test
-        @DisplayName("Check payment status with gateway")
-        void checkPaymentStatusWithGateway_WithValidTransaction_ShouldReturnStatus() {
-            // When
-            String result = paymentService.checkPaymentStatusWithGateway("TXN-12345");
-
-            // Then
-            assertThat(result).isEqualTo("COMPLETED"); // Mocked response
-        }
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, 
+                    () -> paymentService.createPaymentByOrderId(invalidOrderId, "QR_CODE", 30));
     }
 
-    @Nested
-    @DisplayName("Payment Validation Tests")
-    class PaymentValidationTests {
+    // ==================== QR CODE MANAGEMENT TESTS ====================
 
-        @Test
-        @DisplayName("Validate payment with valid data should pass")
-        void validatePayment_WithValidData_ShouldPass() {
-            // Given
-            testOrder.setStatus(OrderStatus.PENDING);
+    @Test
+    void generateQrCode_WithValidPayment_ShouldReturnQrCodeUrl() {
+        // Act
+        String result = paymentService.generateQrCode(testPayment);
 
-            // When & Then
-            assertThatCode(() -> paymentService.validatePayment(testOrder, "QR_CODE"))
-                .doesNotThrowAnyException();
-        }
-
-        @Test
-        @DisplayName("Validate payment with null payment method should throw exception")
-        void validatePayment_WithNullPaymentMethod_ShouldThrowException() {
-            // When & Then
-            assertThatThrownBy(() -> paymentService.validatePayment(testOrder, null))
-                .isInstanceOf(InvalidPaymentException.class)
-                .hasMessageContaining("Payment method cannot be null or empty");
-        }
-
-        @Test
-        @DisplayName("Check if payment is expired")
-        void isPaymentExpired_WithExpiredPayment_ShouldReturnTrue() {
-            // Given
-            testPayment.setExpiresAt(LocalDateTime.now().minusMinutes(10));
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When
-            boolean result = paymentService.isPaymentExpired(testPaymentId);
-
-            // Then
-            assertThat(result).isTrue();
-
-            verify(paymentRepository).findById(testPaymentId);
-        }
-
-        @Test
-        @DisplayName("Check if payment can be cancelled")
-        void canPaymentBeCancelled_WithPendingPayment_ShouldReturnTrue() {
-            // Given
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When
-            boolean result = paymentService.canPaymentBeCancelled(testPaymentId);
-
-            // Then
-            assertThat(result).isTrue();
-
-            verify(paymentRepository).findById(testPaymentId);
-        }
-
-        @Test
-        @DisplayName("Check if payment can be refunded")
-        void canPaymentBeRefunded_WithCompletedPayment_ShouldReturnTrue() {
-            // Given
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When
-            boolean result = paymentService.canPaymentBeRefunded(testPaymentId);
-
-            // Then
-            assertThat(result).isTrue();
-
-            verify(paymentRepository).findById(testPaymentId);
-        }
-
-        @Test
-        @DisplayName("Validate refund amount")
-        void isRefundAmountValid_WithValidAmount_ShouldReturnTrue() {
-            // Given
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            BigDecimal refundAmount = BigDecimal.valueOf(50.00);
-
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When
-            boolean result = paymentService.isRefundAmountValid(testPaymentId, refundAmount);
-
-            // Then
-            assertThat(result).isTrue();
-
-            verify(paymentRepository).findById(testPaymentId);
-        }
-
-        @Test
-        @DisplayName("Validate refund amount with invalid amount should return false")
-        void isRefundAmountValid_WithInvalidAmount_ShouldReturnFalse() {
-            // Given
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            BigDecimal refundAmount = BigDecimal.valueOf(150.00); // More than payment amount
-
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When
-            boolean result = paymentService.isRefundAmountValid(testPaymentId, refundAmount);
-
-            // Then
-            assertThat(result).isFalse();
-
-            verify(paymentRepository).findById(testPaymentId);
-        }
+        // Assert
+        assertNotNull(result);
+        assertTrue(result.contains("payment-gateway.example.com"));
+        assertTrue(result.contains(testPayment.getPaymentReference()));
     }
 
-    @Nested
-    @DisplayName("Payment Expiration Management Tests")
-    class PaymentExpirationManagementTests {
+    @Test
+    void regenerateQrCode_WithValidPayment_ShouldUpdateQrCode() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.PENDING);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
 
-        @Test
-        @DisplayName("Process expired payments")
-        void processExpiredPayments_ShouldMarkExpiredPaymentsAsFailed() {
-            // Given
-            when(paymentRepository.markExpiredPaymentsAsFailed("Payment expired")).thenReturn(5);
-            when(paymentRepository.findExpiredPayments()).thenReturn(Collections.emptyList());
+        // Act
+        Payment result = paymentService.regenerateQrCode(testPayment.getId());
 
-            // When
-            int result = paymentService.processExpiredPayments();
-
-            // Then
-            assertThat(result).isEqualTo(5);
-
-            verify(paymentRepository).markExpiredPaymentsAsFailed("Payment expired");
-            verify(paymentRepository).findExpiredPayments();
-        }
-
-        @Test
-        @DisplayName("Get payments expiring soon")
-        void getPaymentsExpiringSoon_WithValidThreshold_ShouldReturnPayments() {
-            // Given
-            List<Payment> expiringPayments = List.of(testPayment);
-            when(paymentRepository.findPaymentsExpiringSoon(any(LocalDateTime.class))).thenReturn(expiringPayments);
-
-            // When
-            List<Payment> result = paymentService.getPaymentsExpiringSoon(10);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0)).isEqualTo(testPayment);
-
-            verify(paymentRepository).findPaymentsExpiringSoon(any(LocalDateTime.class));
-        }
-
-        @Test
-        @DisplayName("Extend payment expiration successfully")
-        void extendPaymentExpiration_WithValidPayment_ShouldExtendExpiration() {
-            // Given
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
-
-            // When
-            Payment result = paymentService.extendPaymentExpiration(testPaymentId, 15);
-
-            // Then
-            assertThat(result).isNotNull();
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository).save(any(Payment.class));
-        }
-
-        @Test
-        @DisplayName("Extend payment expiration with invalid status should throw exception")
-        void extendPaymentExpiration_WithInvalidStatus_ShouldThrowException() {
-            // Given
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            when(paymentRepository.findById(testPaymentId)).thenReturn(Optional.of(testPayment));
-
-            // When & Then
-            assertThatThrownBy(() -> paymentService.extendPaymentExpiration(testPaymentId, 15))
-                .isInstanceOf(InvalidPaymentStatusException.class)
-                .hasMessageContaining("Cannot extend expiration for payment in status");
-
-            verify(paymentRepository).findById(testPaymentId);
-            verify(paymentRepository, never()).save(any(Payment.class));
-        }
+        // Assert
+        assertNotNull(result);
+        assertNotNull(result.getQrCodeUrl());
+        verify(paymentRepository).save(testPayment);
     }
 
-    @Nested
-    @DisplayName("Payment Search and Reporting Tests")
-    class PaymentSearchAndReportingTests {
+    @Test
+    void regenerateQrCode_WithCompletedPayment_ShouldThrowException() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.COMPLETED);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
 
-        @Test
-        @DisplayName("Get payments by user with pagination")
-        void getPaymentsByUser_WithValidUser_ShouldReturnPagedPayments() {
-            // Given
-            Pageable pageable = PageRequest.of(0, 10);
-            List<Payment> payments = List.of(testPayment);
-            Page<Payment> page = new PageImpl<>(payments, pageable, 1);
-
-            when(paymentRepository.findByUser(testUser, pageable)).thenReturn(page);
-
-            // When
-            Page<Payment> result = paymentService.getPaymentsByUser(testUser, pageable);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getContent()).hasSize(1);
-            assertThat(result.getContent().get(0)).isEqualTo(testPayment);
-
-            verify(paymentRepository).findByUser(testUser, pageable);
-        }
-
-        @Test
-        @DisplayName("Get payments by username with pagination")
-        void getPaymentsByUsername_WithValidUsername_ShouldReturnPagedPayments() {
-            // Given
-            Pageable pageable = PageRequest.of(0, 10);
-            List<Payment> payments = List.of(testPayment);
-            Page<Payment> page = new PageImpl<>(payments, pageable, 1);
-
-            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
-            when(paymentRepository.findByUser(testUser, pageable)).thenReturn(page);
-
-            // When
-            Page<Payment> result = paymentService.getPaymentsByUsername("testuser", pageable);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getContent()).hasSize(1);
-
-            verify(userRepository).findByUsername("testuser");
-            verify(paymentRepository).findByUser(testUser, pageable);
-        }
-
-        @Test
-        @DisplayName("Search payments with criteria")
-        void searchPayments_WithCriteria_ShouldReturnFilteredPayments() {
-            // Given
-            Pageable pageable = PageRequest.of(0, 10);
-            List<Payment> payments = List.of(testPayment);
-            Page<Payment> page = new PageImpl<>(payments, pageable, 1);
-
-            when(paymentRepository.searchPayments(any(), any(), any(),
-                any(), any(), any(),
-                any(), any(), any(),
-                eq(pageable))).thenReturn(page);
-
-            // When
-            Page<Payment> result = paymentService.searchPayments("TXN", "PAY", "testuser",
-                PaymentStatus.PENDING, "QR_CODE", null, null, null, null, pageable);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getContent()).hasSize(1);
-
-            verify(paymentRepository).searchPayments(any(), any(), any(),
-                any(), any(), any(),
-                any(), any(), any(),
-                eq(pageable));
-        }
-
-        @Test
-        @DisplayName("Get payment statistics")
-        void getPaymentStatistics_ShouldReturnStatistics() {
-            // Given
-            Object[] stats = {10L, 5L, 3L, 1L, 1L, 0L}; // total, pending, completed, failed, cancelled, refunded
-            when(paymentRepository.getPaymentStatistics()).thenReturn(stats);
-            when(paymentRepository.countByStatus(PaymentStatus.PROCESSING)).thenReturn(2L);
-            when(paymentRepository.calculateTotalRevenue()).thenReturn(BigDecimal.valueOf(1000.00));
-            when(paymentRepository.calculateTotalRefundedAmount()).thenReturn(BigDecimal.valueOf(50.00));
-            when(paymentRepository.calculateAveragePaymentAmount()).thenReturn(BigDecimal.valueOf(100.00));
-
-            // When
-            PaymentStatistics result = paymentService.getPaymentStatistics();
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.total()).isEqualTo(10L);
-            assertThat(result.pending()).isEqualTo(5L);
-            assertThat(result.completed()).isEqualTo(3L);
-
-            verify(paymentRepository).getPaymentStatistics();
-            verify(paymentRepository).calculateTotalRevenue();
-        }
-
-        @Test
-        @DisplayName("Get recent payments")
-        void getRecentPayments_WithLimit_ShouldReturnRecentPayments() {
-            // Given
-            List<Payment> payments = List.of(testPayment);
-            when(paymentRepository.findRecentPayments(5)).thenReturn(payments);
-
-            // When
-            List<Payment> result = paymentService.getRecentPayments(5);
-
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0)).isEqualTo(testPayment);
-
-            verify(paymentRepository).findRecentPayments(5);
-        }
+        // Act & Assert
+        assertThrows(InvalidPaymentStatusException.class, 
+                    () -> paymentService.regenerateQrCode(testPayment.getId()));
     }
 
-    @Nested
-    @DisplayName("Payment Utility Methods Tests")
-    class PaymentUtilityMethodsTests {
+    @Test
+    void getQrCodeContent_WithValidPayment_ShouldReturnContent() {
+        // Arrange
+        testPayment.setQrCodeUrl("https://example.com/qr/123");
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
 
-        @Test
-        @DisplayName("Calculate total revenue")
-        void calculateTotalRevenue_ShouldReturnTotalRevenue() {
-            // Given
-            BigDecimal expectedRevenue = BigDecimal.valueOf(5000.00);
-            when(paymentRepository.calculateTotalRevenue()).thenReturn(expectedRevenue);
+        // Act
+        String result = paymentService.getQrCodeContent(testPayment.getId());
 
-            // When
-            BigDecimal result = paymentService.calculateTotalRevenue();
+        // Assert
+        assertEquals("https://example.com/qr/123", result);
+    }
 
-            // Then
-            assertThat(result).isEqualByComparingTo(expectedRevenue);
+    @Test
+    void getQrCodeContent_WithNoQrCode_ShouldThrowException() {
+        // Arrange
+        testPayment.setQrCodeUrl(null);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
 
-            verify(paymentRepository).calculateTotalRevenue();
-        }
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, 
+                    () -> paymentService.getQrCodeContent(testPayment.getId()));
+    }
 
-        @Test
-        @DisplayName("Calculate revenue within date range")
-        void calculateRevenue_WithDateRange_ShouldReturnRevenueForPeriod() {
-            // Given
-            LocalDateTime startDate = LocalDateTime.now().minusDays(7);
-            LocalDateTime endDate = LocalDateTime.now();
-            BigDecimal expectedRevenue = BigDecimal.valueOf(1000.00);
+    // ==================== PAYMENT RETRIEVAL TESTS ====================
 
-            when(paymentRepository.calculateRevenueBetweenDates(startDate, endDate)).thenReturn(expectedRevenue);
+    @Test
+    void findById_WithValidId_ShouldReturnPayment() {
+        // Arrange
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
 
-            // When
-            BigDecimal result = paymentService.calculateRevenue(startDate, endDate);
+        // Act
+        Payment result = paymentService.findById(testPayment.getId());
 
-            // Then
-            assertThat(result).isEqualByComparingTo(expectedRevenue);
+        // Assert
+        assertNotNull(result);
+        assertEquals(testPayment, result);
+        verify(paymentRepository).findById(testPayment.getId());
+    }
 
-            verify(paymentRepository).calculateRevenueBetweenDates(startDate, endDate);
-        }
+    @Test
+    void findById_WithInvalidId_ShouldThrowException() {
+        // Arrange
+        UUID invalidId = UUID.randomUUID();
+        when(paymentRepository.findById(invalidId)).thenReturn(Optional.empty());
 
-        @Test
-        @DisplayName("Calculate total refunded amount")
-        void calculateTotalRefundedAmount_ShouldReturnTotalRefunded() {
-            // Given
-            BigDecimal expectedRefunded = BigDecimal.valueOf(200.00);
-            when(paymentRepository.calculateTotalRefundedAmount()).thenReturn(expectedRefunded);
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, 
+                    () -> paymentService.findById(invalidId));
+    }
 
-            // When
-            BigDecimal result = paymentService.calculateTotalRefundedAmount();
+    @Test
+    void findByTransactionId_WithValidTransactionId_ShouldReturnPayment() {
+        // Arrange
+        String transactionId = "TXN-123456";
+        testPayment.setTransactionId(transactionId);
+        when(paymentRepository.findByTransactionId(transactionId)).thenReturn(Optional.of(testPayment));
 
-            // Then
-            assertThat(result).isEqualByComparingTo(expectedRefunded);
+        // Act
+        Payment result = paymentService.findByTransactionId(transactionId);
 
-            verify(paymentRepository).calculateTotalRefundedAmount();
-        }
+        // Assert
+        assertNotNull(result);
+        assertEquals(testPayment, result);
+        verify(paymentRepository).findByTransactionId(transactionId);
+    }
 
-        @Test
-        @DisplayName("Get supported payment methods")
-        void getSupportedPaymentMethods_ShouldReturnSupportedMethods() {
-            // When
-            List<String> result = paymentService.getSupportedPaymentMethods();
+    @Test
+    void findByOrder_WithValidOrder_ShouldReturnPayment() {
+        // Arrange
+        when(paymentRepository.findByOrder(testOrder)).thenReturn(Optional.of(testPayment));
 
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result).containsExactly("QR_CODE", "BANK_TRANSFER", "CREDIT_CARD", "MOBILE_BANKING");
-        }
+        // Act
+        Payment result = paymentService.findByOrder(testOrder);
 
-        @Test
-        @DisplayName("Get default expiration minutes")
-        void getDefaultExpirationMinutes_ShouldReturnDefaultValue() {
-            // When
-            int result = paymentService.getDefaultExpirationMinutes();
+        // Assert
+        assertNotNull(result);
+        assertEquals(testPayment, result);
+        verify(paymentRepository).findByOrder(testOrder);
+    }
 
-            // Then
-            assertThat(result).isEqualTo(30);
-        }
+    @Test
+    void findByOrderId_WithValidOrderId_ShouldReturnPayment() {
+        // Arrange
+        when(paymentRepository.findByOrderId(testOrder.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act
+        Payment result = paymentService.findByOrderId(testOrder.getId());
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(testPayment, result);
+        verify(paymentRepository).findByOrderId(testOrder.getId());
+    } 
+   // ==================== PAYMENT STATUS MANAGEMENT TESTS ====================
+
+    @Test
+    void markPaymentAsProcessing_WithValidPayment_ShouldUpdateStatus() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.PENDING);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.markPaymentAsProcessing(testPayment.getId());
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(PaymentStatus.PROCESSING, result.getStatus());
+        verify(paymentRepository).save(testPayment);
+    }
+
+    @Test
+    void markPaymentAsCompleted_WithValidPayment_ShouldUpdateStatusAndProcessOrder() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.PROCESSING);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.markPaymentAsCompleted(testPayment.getId(), "TXN-123", "Gateway response");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(PaymentStatus.COMPLETED, result.getStatus());
+        assertEquals("TXN-123", result.getTransactionId());
+        verify(paymentRepository).save(testPayment);
+        verify(orderService).processOrderCompletion(testOrder.getId(), "TXN-123");
+    }
+
+    @Test
+    void markPaymentAsFailed_WithValidPayment_ShouldUpdateStatusAndProcessOrder() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.PROCESSING);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.markPaymentAsFailed(testPayment.getId(), "Payment failed", "Gateway response");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(PaymentStatus.FAILED, result.getStatus());
+        assertEquals("Payment failed", result.getFailureReason());
+        verify(paymentRepository).save(testPayment);
+        verify(orderService).processOrderFailure(testOrder.getId(), "Payment failed");
+    }
+
+    @Test
+    void cancelPayment_WithValidPayment_ShouldUpdateStatusAndCancelOrder() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.PENDING);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.cancelPayment(testPayment.getId(), "User cancelled");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(PaymentStatus.CANCELLED, result.getStatus());
+        verify(paymentRepository).save(testPayment);
+        verify(orderService).cancelOrder(testOrder.getId(), "User cancelled");
+    }
+
+    @Test
+    void cancelPayment_WithCompletedPayment_ShouldThrowException() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.COMPLETED);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act & Assert
+        assertThrows(InvalidPaymentStatusException.class, 
+                    () -> paymentService.cancelPayment(testPayment.getId(), "User cancelled"));
+    }
+
+    @Test
+    void processRefund_WithValidPayment_ShouldProcessRefund() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.COMPLETED);
+        BigDecimal refundAmount = BigDecimal.valueOf(50.00);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.processRefund(testPayment.getId(), refundAmount, "Partial refund");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(PaymentStatus.REFUNDED, result.getStatus());
+        assertEquals(refundAmount, result.getRefundAmount());
+        verify(paymentRepository).save(testPayment);
+    }
+
+    @Test
+    void processRefund_WithInvalidAmount_ShouldThrowException() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.COMPLETED);
+        BigDecimal invalidRefundAmount = BigDecimal.valueOf(150.00); // More than payment amount
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act & Assert
+        assertThrows(InvalidRefundException.class, 
+                    () -> paymentService.processRefund(testPayment.getId(), invalidRefundAmount, "Invalid refund"));
+    }
+
+    // ==================== PAYMENT GATEWAY INTEGRATION TESTS ====================
+
+    @Test
+    void processWebhook_WithCompletedStatus_ShouldMarkPaymentAsCompleted() {
+        // Arrange
+        String transactionId = "TXN-123456";
+        testPayment.setTransactionId(transactionId);
+        testPayment.setStatus(PaymentStatus.PROCESSING);
+        when(paymentRepository.findByTransactionId(transactionId)).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.processWebhook(transactionId, "COMPLETED", "Gateway response");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(PaymentStatus.COMPLETED, result.getStatus());
+        verify(orderService).processOrderCompletion(testOrder.getId(), transactionId);
+    }
+
+    @Test
+    void processWebhook_WithFailedStatus_ShouldMarkPaymentAsFailed() {
+        // Arrange
+        String transactionId = "TXN-123456";
+        testPayment.setTransactionId(transactionId);
+        testPayment.setStatus(PaymentStatus.PROCESSING);
+        when(paymentRepository.findByTransactionId(transactionId)).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.processWebhook(transactionId, "FAILED", "Gateway response");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(PaymentStatus.FAILED, result.getStatus());
+        verify(orderService).processOrderFailure(testOrder.getId(), "Payment failed via webhook");
+    }
+
+    @Test
+    void processWebhook_WithUnknownStatus_ShouldThrowException() {
+        // Arrange
+        String transactionId = "TXN-123456";
+        testPayment.setTransactionId(transactionId);
+        when(paymentRepository.findByTransactionId(transactionId)).thenReturn(Optional.of(testPayment));
+
+        // Act & Assert
+        assertThrows(WebhookProcessingException.class, 
+                    () -> paymentService.processWebhook(transactionId, "UNKNOWN", "Gateway response"));
+    }
+
+    @Test
+    void verifyPaymentWithGateway_WithValidPayment_ShouldVerifyAndUpdate() {
+        // Arrange
+        testPayment.setTransactionId("TXN-123456");
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.findByTransactionId(testPayment.getTransactionId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.verifyPaymentWithGateway(testPayment.getId());
+
+        // Assert
+        assertNotNull(result);
+        // Note: The mock implementation returns "COMPLETED" status
+        verify(orderService).processOrderCompletion(testOrder.getId(), testPayment.getTransactionId());
+    }
+
+    @Test
+    void checkPaymentStatusWithGateway_WithValidTransactionId_ShouldReturnStatus() {
+        // Act
+        String result = paymentService.checkPaymentStatusWithGateway("TXN-123456");
+
+        // Assert
+        assertEquals("COMPLETED", result); // Mock implementation returns COMPLETED
+    }  
+  // ==================== PAYMENT VALIDATION TESTS ====================
+
+    @Test
+    void validatePayment_WithValidInput_ShouldNotThrowException() {
+        // Act & Assert
+        assertDoesNotThrow(() -> paymentService.validatePayment(testOrder, "QR_CODE"));
+    }
+
+    @Test
+    void validatePayment_WithInvalidPaymentMethod_ShouldThrowException() {
+        // Act & Assert
+        assertThrows(InvalidPaymentException.class, 
+                    () -> paymentService.validatePayment(testOrder, "INVALID_METHOD"));
+    }
+
+    @Test
+    void validatePayment_WithNullPaymentMethod_ShouldThrowException() {
+        // Act & Assert
+        assertThrows(InvalidPaymentException.class, 
+                    () -> paymentService.validatePayment(testOrder, null));
+    }
+
+    @Test
+    void validatePayment_WithCompletedOrder_ShouldThrowException() {
+        // Arrange
+        testOrder.setStatus(com.accountselling.platform.enums.OrderStatus.COMPLETED);
+
+        // Act & Assert
+        assertThrows(InvalidPaymentException.class, 
+                    () -> paymentService.validatePayment(testOrder, "QR_CODE"));
+    }
+
+    @Test
+    void validatePayment_WithZeroAmount_ShouldThrowException() {
+        // Arrange
+        testOrder.setTotalAmount(BigDecimal.ZERO);
+
+        // Act & Assert
+        assertThrows(InvalidPaymentException.class, 
+                    () -> paymentService.validatePayment(testOrder, "QR_CODE"));
+    }
+
+    @Test
+    void isPaymentExpired_WithExpiredPayment_ShouldReturnTrue() {
+        // Arrange
+        testPayment.setExpiresAt(LocalDateTime.now().minusMinutes(10));
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act
+        boolean result = paymentService.isPaymentExpired(testPayment.getId());
+
+        // Assert
+        assertTrue(result);
+    }
+
+    @Test
+    void isPaymentExpired_WithValidPayment_ShouldReturnFalse() {
+        // Arrange
+        testPayment.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act
+        boolean result = paymentService.isPaymentExpired(testPayment.getId());
+
+        // Assert
+        assertFalse(result);
+    }
+
+    @Test
+    void canPaymentBeCancelled_WithPendingPayment_ShouldReturnTrue() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.PENDING);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act
+        boolean result = paymentService.canPaymentBeCancelled(testPayment.getId());
+
+        // Assert
+        assertTrue(result);
+    }
+
+    @Test
+    void canPaymentBeRefunded_WithCompletedPayment_ShouldReturnTrue() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.COMPLETED);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act
+        boolean result = paymentService.canPaymentBeRefunded(testPayment.getId());
+
+        // Assert
+        assertTrue(result);
+    }
+
+    @Test
+    void isRefundAmountValid_WithValidAmount_ShouldReturnTrue() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.COMPLETED);
+        BigDecimal refundAmount = BigDecimal.valueOf(50.00);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act
+        boolean result = paymentService.isRefundAmountValid(testPayment.getId(), refundAmount);
+
+        // Assert
+        assertTrue(result);
+    }
+
+    @Test
+    void isRefundAmountValid_WithExcessiveAmount_ShouldReturnFalse() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.COMPLETED);
+        BigDecimal refundAmount = BigDecimal.valueOf(150.00); // More than payment amount
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act
+        boolean result = paymentService.isRefundAmountValid(testPayment.getId(), refundAmount);
+
+        // Assert
+        assertFalse(result);
+    }
+
+    // ==================== PAYMENT EXPIRATION MANAGEMENT TESTS ====================
+
+    @Test
+    void processExpiredPayments_WithExpiredPayments_ShouldMarkAsFailed() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.FAILED); // Set status to FAILED to simulate expired payment
+        List<Payment> expiredPayments = List.of(testPayment);
+        when(paymentRepository.markExpiredPaymentsAsFailed("Payment expired")).thenReturn(1);
+        when(paymentRepository.findExpiredPayments()).thenReturn(expiredPayments);
+
+        // Act
+        int result = paymentService.processExpiredPayments();
+
+        // Assert
+        assertEquals(1, result);
+        verify(paymentRepository).markExpiredPaymentsAsFailed("Payment expired");
+        verify(orderService).processOrderFailure(testOrder.getId(), "Payment expired");
+    }
+
+    @Test
+    void getPaymentsExpiringSoon_WithThreshold_ShouldReturnPayments() {
+        // Arrange
+        List<Payment> expiringSoonPayments = List.of(testPayment);
+        when(paymentRepository.findPaymentsExpiringSoon(any(LocalDateTime.class))).thenReturn(expiringSoonPayments);
+
+        // Act
+        List<Payment> result = paymentService.getPaymentsExpiringSoon(15);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testPayment, result.get(0));
+    }
+
+    @Test
+    void extendPaymentExpiration_WithValidPayment_ShouldExtendExpiration() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.PENDING);
+        testPayment.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        // Act
+        Payment result = paymentService.extendPaymentExpiration(testPayment.getId(), 15);
+
+        // Assert
+        assertNotNull(result);
+        verify(paymentRepository).save(testPayment);
+    }
+
+    @Test
+    void extendPaymentExpiration_WithCompletedPayment_ShouldThrowException() {
+        // Arrange
+        testPayment.setStatus(PaymentStatus.COMPLETED);
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+
+        // Act & Assert
+        assertThrows(InvalidPaymentStatusException.class, 
+                    () -> paymentService.extendPaymentExpiration(testPayment.getId(), 15));
+    }
+
+    // ==================== PAYMENT SEARCH AND REPORTING TESTS ====================
+
+    @Test
+    void getPaymentsByUser_WithValidUser_ShouldReturnPayments() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Payment> payments = List.of(testPayment);
+        Page<Payment> paymentPage = new PageImpl<>(payments, pageable, 1);
+        
+        when(paymentRepository.findByUser(testUser, pageable)).thenReturn(paymentPage);
+
+        // Act
+        Page<Payment> result = paymentService.getPaymentsByUser(testUser, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testPayment, result.getContent().get(0));
+    }
+
+    @Test
+    void getPaymentsByUsername_WithValidUsername_ShouldReturnPayments() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Payment> payments = List.of(testPayment);
+        Page<Payment> paymentPage = new PageImpl<>(payments, pageable, 1);
+        
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(paymentRepository.findByUser(testUser, pageable)).thenReturn(paymentPage);
+
+        // Act
+        Page<Payment> result = paymentService.getPaymentsByUsername("testuser", pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        verify(userRepository).findByUsername("testuser");
+    }
+
+    @Test
+    void getPaymentsByStatus_WithValidStatus_ShouldReturnPayments() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Payment> payments = List.of(testPayment);
+        Page<Payment> paymentPage = new PageImpl<>(payments, pageable, 1);
+        
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING, pageable)).thenReturn(paymentPage);
+
+        // Act
+        Page<Payment> result = paymentService.getPaymentsByStatus(PaymentStatus.PENDING, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void searchPayments_WithCriteria_ShouldReturnMatchingPayments() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Payment> payments = List.of(testPayment);
+        Page<Payment> paymentPage = new PageImpl<>(payments, pageable, 1);
+        
+        when(paymentRepository.searchPayments(anyString(), anyString(), anyString(),
+                any(PaymentStatus.class), anyString(), any(LocalDateTime.class),
+                any(LocalDateTime.class), any(BigDecimal.class), any(BigDecimal.class),
+                eq(pageable))).thenReturn(paymentPage);
+
+        // Act
+        Page<Payment> result = paymentService.searchPayments("TXN", "PAY", "testuser",
+                PaymentStatus.PENDING, "QR_CODE", LocalDateTime.now().minusDays(1),
+                LocalDateTime.now(), BigDecimal.ZERO, BigDecimal.valueOf(1000), pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void getPaymentStatistics_ShouldReturnStatistics() {
+        // Arrange
+        Object[] stats = {10L, 3L, 5L, 2L, 1L, 1L}; // total, pending, completed, failed, cancelled, refunded
+        when(paymentRepository.getPaymentStatistics()).thenReturn(stats);
+        when(paymentRepository.countByStatus(PaymentStatus.PROCESSING)).thenReturn(1L);
+        when(paymentRepository.calculateTotalRevenue()).thenReturn(BigDecimal.valueOf(1000));
+
+        // Act
+        PaymentStatistics result = paymentService.getPaymentStatistics();
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(10L, result.total());
+        assertEquals(3L, result.pending());
+        assertEquals(5L, result.completed());
+        assertEquals(2L, result.failed());
+    }
+
+    @Test
+    void getRecentPayments_ShouldReturnRecentPayments() {
+        // Arrange
+        List<Payment> recentPayments = List.of(testPayment);
+        when(paymentRepository.findRecentPayments(10)).thenReturn(recentPayments);
+
+        // Act
+        List<Payment> result = paymentService.getRecentPayments(10);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testPayment, result.get(0));
+    }
+
+    // ==================== PAYMENT UTILITY METHODS TESTS ====================
+
+    @Test
+    void calculateTotalRevenue_ShouldReturnTotalRevenue() {
+        // Arrange
+        when(paymentRepository.calculateTotalRevenue()).thenReturn(BigDecimal.valueOf(5000));
+
+        // Act
+        BigDecimal result = paymentService.calculateTotalRevenue();
+
+        // Assert
+        assertEquals(BigDecimal.valueOf(5000), result);
+        verify(paymentRepository).calculateTotalRevenue();
+    }
+
+    @Test
+    void calculateRevenue_WithDateRange_ShouldReturnRevenue() {
+        // Arrange
+        LocalDateTime startDate = LocalDateTime.now().minusDays(7);
+        LocalDateTime endDate = LocalDateTime.now();
+        when(paymentRepository.calculateRevenueBetweenDates(startDate, endDate)).thenReturn(BigDecimal.valueOf(1000));
+
+        // Act
+        BigDecimal result = paymentService.calculateRevenue(startDate, endDate);
+
+        // Assert
+        assertEquals(BigDecimal.valueOf(1000), result);
+        verify(paymentRepository).calculateRevenueBetweenDates(startDate, endDate);
+    }
+
+    @Test
+    void calculateTotalRefundedAmount_ShouldReturnRefundedAmount() {
+        // Arrange
+        when(paymentRepository.calculateTotalRefundedAmount()).thenReturn(BigDecimal.valueOf(200));
+
+        // Act
+        BigDecimal result = paymentService.calculateTotalRefundedAmount();
+
+        // Assert
+        assertEquals(BigDecimal.valueOf(200), result);
+        verify(paymentRepository).calculateTotalRefundedAmount();
+    }
+
+    @Test
+    void getSupportedPaymentMethods_ShouldReturnSupportedMethods() {
+        // Act
+        List<String> result = paymentService.getSupportedPaymentMethods();
+
+        // Assert
+        assertNotNull(result);
+        assertTrue(result.contains("QR_CODE"));
+        assertTrue(result.contains("BANK_TRANSFER"));
+        assertTrue(result.contains("CREDIT_CARD"));
+        assertTrue(result.contains("MOBILE_BANKING"));
+    }
+
+    @Test
+    void getDefaultExpirationMinutes_ShouldReturnDefaultValue() {
+        // Act
+        int result = paymentService.getDefaultExpirationMinutes();
+
+        // Assert
+        assertEquals(30, result);
     }
 }

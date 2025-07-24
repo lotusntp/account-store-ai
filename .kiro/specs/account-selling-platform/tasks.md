@@ -122,7 +122,7 @@
     - Write unit tests for services
     - _Requirements: 2.3, 2.4, 4.4, 5.4_
 
-  - [ ] 4.4 Implement order and payment services
+  - [x] 4.4 Implement order and payment services
     - Create OrderService
     - Create PaymentService
     - Implement QR code generation for payment
