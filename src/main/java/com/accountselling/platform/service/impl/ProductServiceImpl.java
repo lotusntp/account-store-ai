@@ -6,6 +6,7 @@ import com.accountselling.platform.model.Category;
 import com.accountselling.platform.model.Product;
 import com.accountselling.platform.repository.CategoryRepository;
 import com.accountselling.platform.repository.ProductRepository;
+import com.accountselling.platform.repository.StockRepository;
 import com.accountselling.platform.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final StockRepository stockRepository;
 
     // ========== Read Operations ==========
 
@@ -241,12 +243,15 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(productId)
             .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
 
-        long totalStock = product.getTotalStockCount();
-        long availableStock = product.getAvailableStockCount();
-        long soldStock = product.getSoldStockCount();
-        long reservedStock = product.getReservedStockCount();
-        boolean inStock = product.isInStock();
-        boolean lowStock = product.isLowStock();
+        // Use direct counting queries to avoid casting issues
+        long totalStock = stockRepository.countByProduct(product);
+        long availableStock = stockRepository.countAvailableByProduct(product);
+        long soldStock = stockRepository.countByProductAndSoldTrue(product);
+        long reservedStock = stockRepository.countReservedByProduct(product);
+        
+        boolean inStock = availableStock > 0;
+        boolean lowStock = product.getLowStockThreshold() != null && 
+                          availableStock <= product.getLowStockThreshold();
 
         return new ProductStockInfo(productId, totalStock, availableStock, 
                                   soldStock, reservedStock, inStock, lowStock);

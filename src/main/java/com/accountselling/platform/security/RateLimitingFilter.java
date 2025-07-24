@@ -10,6 +10,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
@@ -28,6 +29,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    
+    @Value("${spring.profiles.active:prod}")
+    private String activeProfile;
 
     @Override
     protected void doFilterInternal(
@@ -39,6 +43,12 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         // Skip rate limiting for certain paths
         String path = request.getRequestURI();
         if (path.contains("/api-docs") || path.contains("/swagger-ui") || path.contains("/actuator")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        
+        // Skip rate limiting entirely for test profile
+        if ("test".equals(activeProfile)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -76,8 +86,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private Bucket createNewBucket(String clientId) {
-        // Allow 30 requests per minute
-        Bandwidth limit = Bandwidth.classic(30, Refill.greedy(30, Duration.ofMinutes(1)));
+        // Use different rate limits based on profile
+        Bandwidth limit;
+        if ("test".equals(activeProfile)) {
+            // Very permissive limits for testing - 1000 requests per minute
+            limit = Bandwidth.classic(1000, Refill.greedy(1000, Duration.ofMinutes(1)));
+        } else {
+            // Production limits - 30 requests per minute
+            limit = Bandwidth.classic(30, Refill.greedy(30, Duration.ofMinutes(1)));
+        }
 
         // ใช้ LocalBucketBuilder แทน Bucket4j.builder() ที่ถูก deprecated
         LocalBucketBuilder builder = new LocalBucketBuilder();

@@ -3,6 +3,7 @@ package com.accountselling.platform.exception.handler;
 import com.accountselling.platform.dto.error.ErrorResponse;
 import com.accountselling.platform.exception.*;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.util.stream.Collectors;
@@ -47,6 +49,49 @@ public class GlobalExceptionHandler {
             .collect(Collectors.joining(", "));
             
         log.warn("Validation error at {}: {}", request.getRequestURI(), message);
+        
+        ErrorResponse error = ErrorResponse.badRequest(message, request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Handle constraint validation errors from @Validated annotation.
+     * 
+     * @param ex the ConstraintViolationException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolationException(
+            ConstraintViolationException ex, HttpServletRequest request) {
+        
+        String message = ex.getConstraintViolations().stream()
+            .map(violation -> violation.getMessage())
+            .collect(Collectors.joining(", "));
+            
+        log.warn("Constraint violation at {}: {}", request.getRequestURI(), message);
+        
+        ErrorResponse error = ErrorResponse.badRequest(message, request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Handle method validation errors from @Validated annotation (Spring Boot 3.x).
+     * 
+     * @param ex the HandlerMethodValidationException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ErrorResponse> handleHandlerMethodValidationException(
+            HandlerMethodValidationException ex, HttpServletRequest request) {
+        
+        String message = ex.getAllValidationResults().stream()
+            .flatMap(result -> result.getResolvableErrors().stream())
+            .map(error -> error.getDefaultMessage())
+            .collect(Collectors.joining(", "));
+            
+        log.warn("Method validation error at {}: {}", request.getRequestURI(), message);
         
         ErrorResponse error = ErrorResponse.badRequest(message, request.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);

@@ -7,6 +7,7 @@ import com.accountselling.platform.model.Product;
 import com.accountselling.platform.model.Stock;
 import com.accountselling.platform.repository.CategoryRepository;
 import com.accountselling.platform.repository.ProductRepository;
+import com.accountselling.platform.repository.StockRepository;
 import com.accountselling.platform.service.ProductService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ class ProductServiceImplTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+    @Mock private StockRepository stockRepository;
 
     @InjectMocks
     private ProductServiceImpl productService;

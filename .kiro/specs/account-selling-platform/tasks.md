@@ -140,7 +140,7 @@
     - Write integration tests for controllers
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 5.3_
 
-  - [ ] 5.2 Implement product catalog controllers
+  - [x] 5.2 Implement product catalog controllers
 
     - Create CategoryController
     - Create ProductController
