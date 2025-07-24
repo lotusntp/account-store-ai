@@ -56,6 +56,12 @@ public class UserServiceImpl implements UserService {
 
   @Override
   @Transactional
+  public User registerUser(String username, String password) {
+    return registerUser(username, password, null, null, null);
+  }
+
+  @Override
+  @Transactional
   public User registerUser(String username, String password, String email) {
     return registerUser(username, password, email, null, null);
   }

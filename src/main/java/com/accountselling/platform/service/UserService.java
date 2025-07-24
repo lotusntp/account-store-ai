@@ -16,6 +16,16 @@ import java.util.UUID;
 public interface UserService extends UserDetailsService {
 
     /**
+     * Register a new user account with username and password only.
+     * 
+     * @param username the username for the new account
+     * @param password the plain text password (will be encoded)
+     * @return the created user
+     * @throws IllegalArgumentException if username already exists
+     */
+    User registerUser(String username, String password);
+
+    /**
      * Register a new user account.
      * 
      * @param username the username for the new account

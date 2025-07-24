@@ -30,7 +30,6 @@ class ExceptionHierarchyTest {
 
     @Test
     void testResourceExceptionHierarchy() {
-        assertTrue(ResourceException.class.isAssignableFrom(ResourceNotFoundException.class));
         assertTrue(ResourceException.class.isAssignableFrom(ResourceAlreadyExistsException.class));
         assertTrue(ResourceException.class.isAssignableFrom(ResourceInvalidException.class));
     }

@@ -1,6 +1,7 @@
 package com.accountselling.platform.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,8 @@ public class JwtTokenProvider {
 
     @PostConstruct
     public void init() {
-        this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(Authentication authentication) {
@@ -89,11 +91,19 @@ public class JwtTokenProvider {
                 .parseClaimsJws(token)
                 .getBody();
 
-        Collection<? extends GrantedAuthority> authorities =
-                Arrays.stream(claims.get("roles").toString().split(","))
-                        .filter(auth -> !auth.trim().isEmpty())
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList());
+        Collection<? extends GrantedAuthority> authorities;
+        Object rolesObj = claims.get("roles");
+        
+        if (rolesObj != null) {
+            // Handle tokens with roles claim
+            authorities = Arrays.stream(rolesObj.toString().split(","))
+                    .filter(auth -> !auth.trim().isEmpty())
+                    .map(SimpleGrantedAuthority::new)
+                    .collect(Collectors.toList());
+        } else {
+            // Handle tokens without roles claim - assign default USER role
+            authorities = Arrays.asList(new SimpleGrantedAuthority("ROLE_USER"));
+        }
 
         User principal = new User(claims.getSubject(), "", authorities);
 

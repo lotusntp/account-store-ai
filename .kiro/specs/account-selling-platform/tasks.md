@@ -132,7 +132,7 @@
 
 - [ ] 5. API Layer Implementation
 
-  - [ ] 5.1 Implement authentication and user controllers
+  - [x] 5.1 Implement authentication and user controllers
 
     - Create AuthController for registration and login
     - Create UserController for user profile and orders

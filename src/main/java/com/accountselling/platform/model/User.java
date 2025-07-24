@@ -80,12 +80,14 @@ public class User extends BaseEntity {
     private Set<Order> orders = new HashSet<>();
 
     // Constructor with username and password
+    @Builder
     public User(String username, String password) {
         this.username = username;
         this.password = password;
     }
 
     // Constructor with username, password, and email
+    @Builder
     public User(String username, String password, String email) {
         this.username = username;
         this.password = password;
