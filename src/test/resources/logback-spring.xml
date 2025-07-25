@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!-- Simple format -->
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ปิด Hibernate SQL -->
+    <logger name="org.hibernate.SQL" level="OFF"/>
+    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="OFF"/>
+    <logger name="org.hibernate.orm.jdbc.bind" level="OFF"/>
+
+    <!-- ปิด JSON log ของคุณเอง เช่น com.accountselling -->
+    <logger name="com.accountselling" level="ERROR"/>
+
+    <!-- ปิด Spring Security log ที่ verbose มาก -->
+    <logger name="org.springframework.security" level="ERROR"/>
+
+    <!-- ปิด mock log ของ Spring MVC Test -->
+    <logger name="org.springframework.test.web.servlet" level="OFF"/>
+
+    <!-- ปิด JPA table ddl logs -->
+    <logger name="org.hibernate.tool.schema" level="OFF"/>
+    <logger name="org.hibernate.SQL" level="OFF"/>
+
+    <!-- ปิด log root ทั้งหมดเหลือเฉพาะ error -->
+    <root level="ERROR">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

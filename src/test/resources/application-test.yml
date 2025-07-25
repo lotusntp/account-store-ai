@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
-    password: 
+    password:
     driver-class-name: org.h2.Driver
   flyway:
     enabled: false
@@ -15,8 +15,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
-    show-sql: true
+    show-sql: false
     database-platform: org.hibernate.dialect.H2Dialect
+    properties:
+      hibernate:
+        format_sql: false
 
 management:
   tracing:
@@ -29,12 +32,12 @@ management:
 
 logging:
   level:
-    root: INFO
-    com.accountselling.platform: DEBUG
-    org.springframework: INFO
-  elasticsearch:
-    host: localhost
-    port: 5000
+    root: ERROR
+    org.hibernate: OFF
+    com.accountselling.platform: ERROR
+    org.springframework.test: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n"
 
 otel:
   sdk:
@@ -47,5 +50,5 @@ otel:
 app:
   jwt:
     secret: dGhpc19pc19hX3NlY3VyZV9zZWNyZXRfa2V5X2Zvcl9qd3RfdG9rZW5zX3RoYXRfaXNfbG9uZ19lbm91Z2g=
-    access-token-expiration: 900000    # 15 minutes
+    access-token-expiration: 900000 # 15 minutes
     refresh-token-expiration: 604800000 # 7 days

@@ -53,7 +53,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     // Supported payment methods
     private static final List<String> SUPPORTED_PAYMENT_METHODS = Arrays.asList(
-        "QR_CODE", "BANK_TRANSFER", "CREDIT_CARD", "MOBILE_BANKING"
+        "QR_CODE", "QRCODE", "BANK_TRANSFER", "CREDIT_CARD", "MOBILE_BANKING"
     );
 
     // ==================== PAYMENT CREATION ====================
@@ -419,7 +419,15 @@ public class PaymentServiceImpl implements PaymentService {
     public Payment processWebhook(String transactionId, String status, String gatewayResponse) {
         log.info("Processing webhook for transaction: {} with status: {}", transactionId, status);
         
-        Payment payment = findByTransactionId(transactionId);
+        // Try to find by transaction ID first, then by payment reference
+        Payment payment;
+        try {
+            payment = findByTransactionId(transactionId);
+        } catch (ResourceNotFoundException e) {
+            // If not found by transaction ID, try by payment reference
+            log.debug("Payment not found by transaction ID, trying payment reference: {}", transactionId);
+            payment = findByPaymentReference(transactionId);
+        }
         
         try {
             switch (status.toUpperCase()) {

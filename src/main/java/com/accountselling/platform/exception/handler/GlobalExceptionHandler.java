@@ -501,6 +501,23 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle invalid payment exceptions.
+     * 
+     * @param ex      the InvalidPaymentException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(InvalidPaymentException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPaymentException(
+            InvalidPaymentException ex, HttpServletRequest request) {
+
+        log.warn("Invalid payment error at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.badRequest(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
      * Handle webhook processing exceptions.
      * 
      * @param ex      the WebhookProcessingException
@@ -515,5 +532,22 @@ public class GlobalExceptionHandler {
 
         ErrorResponse error = ErrorResponse.internalServerError(ex.getMessage(), request.getRequestURI());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+
+    /**
+     * Handle unauthorized exceptions.
+     * 
+     * @param ex      the UnauthorizedException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorizedException(
+            UnauthorizedException ex, HttpServletRequest request) {
+
+        log.warn("Unauthorized access at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.notFound("Resource not found", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 }

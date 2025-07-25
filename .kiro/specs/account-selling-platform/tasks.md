@@ -148,7 +148,7 @@
     - Write integration tests for controllers
     - _Requirements: 2.1, 2.2, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-  - [ ] 5.3 Implement payment and order controllers
+  - [x] 5.3 Implement payment and order controllers
 
     - Create PaymentController
     - Create OrderController

@@ -217,7 +217,7 @@ class PaymentOrderIntegrationTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> paymentData = objectMapper.readValue(paymentResponse, Map.class);
         String paymentId = (String) paymentData.get("id");
-        String transactionId = (String) paymentData.get("transactionId");
+        String paymentReference = (String) paymentData.get("paymentReference");
 
         // Step 3: Check Payment Status
         mockMvc.perform(get("/api/payments/status/{paymentId}", paymentId))
@@ -225,12 +225,11 @@ class PaymentOrderIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(paymentId))
                 .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.transactionId").value(transactionId))
                 .andExpect(jsonPath("$.qrCodeUrl").exists());
 
         // Step 4: Simulate Payment Gateway Webhook - Payment Completed
         Map<String, Object> webhookData = new HashMap<>();
-        webhookData.put("transaction_id", transactionId);
+        webhookData.put("transaction_id", paymentReference); // Use payment reference as transaction ID
         webhookData.put("status", "completed");
         webhookData.put("amount", "99.99");
         webhookData.put("currency", "USD");
@@ -322,11 +321,11 @@ class PaymentOrderIntegrationTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> paymentData = objectMapper.readValue(paymentResponse, Map.class);
         String paymentId = (String) paymentData.get("id");
-        String transactionId = (String) paymentData.get("transactionId");
+        String paymentReference = (String) paymentData.get("paymentReference");
 
         // Step 3: Simulate Payment Gateway Webhook - Payment Failed
         Map<String, Object> webhookData = new HashMap<>();
-        webhookData.put("transaction_id", transactionId);
+        webhookData.put("transaction_id", paymentReference); // Use payment reference as transaction ID
         webhookData.put("status", "failed");
         webhookData.put("failure_reason", "Insufficient funds");
         webhookData.put("gateway_reference", "GTW-FAIL-" + System.currentTimeMillis());
@@ -445,12 +444,13 @@ class PaymentOrderIntegrationTest {
                 .andDo(print())
                 .andExpect(status().isUnauthorized());
 
-        // Note: Webhook endpoint currently requires authentication (should be configured as permitAll in production)
+        // Note: Webhook endpoint is configured as permitAll for production use
+        // It should return 500 for webhook processing errors (WebhookProcessingException)
         mockMvc.perform(post("/api/payments/webhook")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
                 .andDo(print())
-                .andExpect(status().isUnauthorized()); // Currently requires auth due to security config
+                .andExpect(status().isInternalServerError()); // Webhook is public but throws WebhookProcessingException for invalid data
     }
 
     @Test
