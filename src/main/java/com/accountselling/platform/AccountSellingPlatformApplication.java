@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * secure marketplace for selling digital accounts.
  *
  * <p>Includes OpenTelemetry configuration for observability and tracing.
+ *
  * <p>Enables scheduling for automated inventory management tasks.
  */
 @SpringBootApplication

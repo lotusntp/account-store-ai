@@ -6,19 +6,18 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * DTO for user login request.
- * Contains authentication credentials.
- * 
- * DTO สำหรับคำขอเข้าสู่ระบบ
+ * DTO for user login request. Contains authentication credentials.
+ *
+ * <p>DTO สำหรับคำขอเข้าสู่ระบบ
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class LoginRequestDto {
 
-    @NotBlank(message = "Username cannot be blank")
-    private String username;
+  @NotBlank(message = "Username cannot be blank")
+  private String username;
 
-    @NotBlank(message = "Password cannot be blank")
-    private String password;
+  @NotBlank(message = "Password cannot be blank")
+  private String password;
 }

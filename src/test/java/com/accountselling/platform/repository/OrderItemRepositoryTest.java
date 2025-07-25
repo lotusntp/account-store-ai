@@ -23,8 +23,8 @@ import org.springframework.test.context.ActiveProfiles;
  * Comprehensive unit tests for OrderItemRepository. Tests order item management operations
  * including product analysis, user purchases, and sales reporting functionality.
  *
- * <p>OrderItemRepository testing covering order item management, product analysis,
- * user purchases, and sales reporting
+ * <p>OrderItemRepository testing covering order item management, product analysis, user purchases,
+ * and sales reporting
  */
 @DataJpaTest
 @ActiveProfiles("test")

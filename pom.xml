@@ -223,6 +223,12 @@
                     <reuseForks>true</reuseForks>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>com.github.sherter.google-java-format</groupId>
+                <artifactId>google-java-format-maven-plugin</artifactId>
+                <version>1.10.0</version>
+            </plugin>
+
             <!-- Temporarily disabled due to Java compatibility issues
             <plugin>
                 <groupId>com.coveo</groupId>

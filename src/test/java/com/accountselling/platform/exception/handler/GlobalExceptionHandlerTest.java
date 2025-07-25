@@ -573,7 +573,7 @@ class GlobalExceptionHandlerTest {
   @DisplayName("Handle InsufficientPermissionsException - Success")
   void handleInsufficientPermissionsException_Success() {
     // Arrange
-    InsufficientPermissionsException exception = 
+    InsufficientPermissionsException exception =
         new InsufficientPermissionsException("Insufficient permissions to access this resource");
 
     // Act
@@ -585,7 +585,8 @@ class GlobalExceptionHandlerTest {
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().status()).isEqualTo(403);
     assertThat(response.getBody().error()).isEqualTo("Forbidden");
-    assertThat(response.getBody().message()).isEqualTo("Insufficient permissions to access this resource");
+    assertThat(response.getBody().message())
+        .isEqualTo("Insufficient permissions to access this resource");
   }
 
   @Test

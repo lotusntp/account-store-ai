@@ -6,16 +6,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * DTO for token refresh request.
- * Contains refresh token for renewing access token.
- * 
- * DTO สำหรับคำขอต่ออายุ token
+ * DTO for token refresh request. Contains refresh token for renewing access token.
+ *
+ * <p>DTO สำหรับคำขอต่ออายุ token
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class RefreshTokenRequestDto {
 
-    @NotBlank(message = "Refresh token cannot be blank")
-    private String refreshToken;
+  @NotBlank(message = "Refresh token cannot be blank")
+  private String refreshToken;
 }

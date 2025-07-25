@@ -3,8 +3,8 @@ package com.accountselling.platform.dto.statistics;
 import java.math.BigDecimal;
 
 /**
- * Payment statistics data class containing comprehensive payment metrics
- * including counts by status, revenue information, and success rates.
+ * Payment statistics data class containing comprehensive payment metrics including counts by
+ * status, revenue information, and success rates.
  */
 public record PaymentStatistics(
     long total,
@@ -17,5 +17,4 @@ public record PaymentStatistics(
     BigDecimal totalRevenue,
     BigDecimal totalRefunded,
     BigDecimal averagePaymentAmount,
-    double successRate
-) {}
+    double successRate) {}

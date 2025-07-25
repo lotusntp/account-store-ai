@@ -1,9 +1,14 @@
 package com.accountselling.platform.service.impl;
 
-import com.accountselling.platform.enums.OrderStatus;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.accountselling.platform.model.*;
 import com.accountselling.platform.repository.*;
 import com.accountselling.platform.service.StockService;
+import java.math.BigDecimal;
+import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,83 +16,70 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class OrderServiceImplSimpleTest {
 
-    @Mock
-    private OrderRepository orderRepository;
-    
-    @Mock
-    private UserRepository userRepository;
-    
-    @Mock
-    private ProductRepository productRepository;
-    
-    @Mock
-    private StockRepository stockRepository;
-    
-    @Mock
-    private StockService stockService;
+  @Mock private OrderRepository orderRepository;
 
-    @InjectMocks
-    private OrderServiceImpl orderService;
+  @Mock private UserRepository userRepository;
 
-    private User testUser;
-    private Product testProduct;
-    private Order testOrder;
+  @Mock private ProductRepository productRepository;
 
-    @BeforeEach
-    void setUp() {
-        testUser = new User();
-        testUser.setId(UUID.randomUUID());
-        testUser.setUsername("testuser");
+  @Mock private StockRepository stockRepository;
 
-        testProduct = new Product();
-        testProduct.setId(UUID.randomUUID());
-        testProduct.setName("Test Product");
-        testProduct.setPrice(BigDecimal.valueOf(100.00));
+  @Mock private StockService stockService;
 
-        testOrder = new Order(testUser, BigDecimal.valueOf(100.00));
-        testOrder.setId(UUID.randomUUID());
-    }
+  @InjectMocks private OrderServiceImpl orderService;
 
-    @Test
-    void findById_WithValidId_ShouldReturnOrder() {
-        // Arrange
-        UUID orderId = testOrder.getId();
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(testOrder));
+  private User testUser;
+  private Product testProduct;
+  private Order testOrder;
 
-        // Act
-        Order result = orderService.findById(orderId);
+  @BeforeEach
+  void setUp() {
+    testUser = new User();
+    testUser.setId(UUID.randomUUID());
+    testUser.setUsername("testuser");
 
-        // Assert
-        assertNotNull(result);
-        assertEquals(testOrder, result);
-        verify(orderRepository).findById(orderId);
-    }
+    testProduct = new Product();
+    testProduct.setId(UUID.randomUUID());
+    testProduct.setName("Test Product");
+    testProduct.setPrice(BigDecimal.valueOf(100.00));
 
-    @Test
-    void canUserCreateOrders_WithValidUser_ShouldReturnTrue() {
-        // Act
-        boolean result = orderService.canUserCreateOrders(testUser);
+    testOrder = new Order(testUser, BigDecimal.valueOf(100.00));
+    testOrder.setId(UUID.randomUUID());
+  }
 
-        // Assert
-        assertTrue(result);
-    }
+  @Test
+  void findById_WithValidId_ShouldReturnOrder() {
+    // Arrange
+    UUID orderId = testOrder.getId();
+    when(orderRepository.findById(orderId)).thenReturn(Optional.of(testOrder));
 
-    @Test
-    void canUserCreateOrders_WithNullUser_ShouldReturnFalse() {
-        // Act
-        boolean result = orderService.canUserCreateOrders(null);
+    // Act
+    Order result = orderService.findById(orderId);
 
-        // Assert
-        assertFalse(result);
-    }
+    // Assert
+    assertNotNull(result);
+    assertEquals(testOrder, result);
+    verify(orderRepository).findById(orderId);
+  }
+
+  @Test
+  void canUserCreateOrders_WithValidUser_ShouldReturnTrue() {
+    // Act
+    boolean result = orderService.canUserCreateOrders(testUser);
+
+    // Assert
+    assertTrue(result);
+  }
+
+  @Test
+  void canUserCreateOrders_WithNullUser_ShouldReturnFalse() {
+    // Act
+    boolean result = orderService.canUserCreateOrders(null);
+
+    // Assert
+    assertFalse(result);
+  }
 }

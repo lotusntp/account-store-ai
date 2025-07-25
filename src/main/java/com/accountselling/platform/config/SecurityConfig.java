@@ -84,7 +84,8 @@ public class SecurityConfig {
                     .authenticated());
 
     // Add filters in the correct order
-    // RequestContextFilter is automatically added by Spring Boot because it's a @Component with @Order
+    // RequestContextFilter is automatically added by Spring Boot because it's a @Component with
+    // @Order
     http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
     http.addFilterAfter(rateLimitingFilter, JwtAuthenticationFilter.class);
 
