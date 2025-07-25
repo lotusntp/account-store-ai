@@ -61,7 +61,7 @@ public class StockServiceImpl implements StockService {
         // Check if credentials already exist
         if (stockRepository.existsByProductIdAndCredentials(productId, credentials)) {
             log.error("Duplicate credentials for product ID: {}", productId);
-            throw new ResourceAlreadyExistsException("Credentials already exist for this product");
+            throw new StockException("Stock with identical credentials already exists for this product");
         }
 
         // Create new stock

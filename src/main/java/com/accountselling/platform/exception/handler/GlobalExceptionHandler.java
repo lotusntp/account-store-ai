@@ -550,4 +550,303 @@ public class GlobalExceptionHandler {
         ErrorResponse error = ErrorResponse.notFound("Resource not found", request.getRequestURI());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
+
+    // ==================== STOCK-RELATED EXCEPTIONS ====================
+
+    /**
+     * Handle stock exceptions.
+     * 
+     * @param ex      the StockException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(StockException.class)
+    public ResponseEntity<ErrorResponse> handleStockException(
+            StockException ex, HttpServletRequest request) {
+
+        log.warn("Stock error at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.badRequest(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Handle stock reservation exceptions.
+     * 
+     * @param ex      the StockReservationException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(StockReservationException.class)
+    public ResponseEntity<ErrorResponse> handleStockReservationException(
+            StockReservationException ex, HttpServletRequest request) {
+
+        log.warn("Stock reservation error at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.conflict(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    /**
+     * Handle out of stock exceptions.
+     * 
+     * @param ex      the OutOfStockException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(OutOfStockException.class)
+    public ResponseEntity<ErrorResponse> handleOutOfStockException(
+            OutOfStockException ex, HttpServletRequest request) {
+
+        log.warn("Out of stock at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.conflict(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    // ==================== PAYMENT-RELATED EXCEPTIONS ====================
+
+    /**
+     * Handle payment gateway exceptions.
+     * 
+     * @param ex      the PaymentGatewayException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(PaymentGatewayException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentGatewayException(
+            PaymentGatewayException ex, HttpServletRequest request) {
+
+        log.error("Payment gateway error at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.internalServerError(
+                "Payment gateway error", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+
+    /**
+     * Handle payment failed exceptions.
+     * 
+     * @param ex      the PaymentFailedException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(PaymentFailedException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentFailedException(
+            PaymentFailedException ex, HttpServletRequest request) {
+
+        log.warn("Payment failed at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.badRequest(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Handle payment timeout exceptions.
+     * 
+     * @param ex      the PaymentTimeoutException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(PaymentTimeoutException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentTimeoutException(
+            PaymentTimeoutException ex, HttpServletRequest request) {
+
+        log.warn("Payment timeout at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.of(408, "Request Timeout", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).body(error);
+    }
+
+    /**
+     * Handle payment verification exceptions.
+     * 
+     * @param ex      the PaymentVerificationException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(PaymentVerificationException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentVerificationException(
+            PaymentVerificationException ex, HttpServletRequest request) {
+
+        log.warn("Payment verification failed at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.badRequest(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Handle payment already exists exceptions.
+     * 
+     * @param ex      the PaymentAlreadyExistsException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(PaymentAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentAlreadyExistsException(
+            PaymentAlreadyExistsException ex, HttpServletRequest request) {
+
+        log.warn("Payment already exists at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.conflict(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    /**
+     * Handle invalid payment status exceptions.
+     * 
+     * @param ex      the InvalidPaymentStatusException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(InvalidPaymentStatusException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPaymentStatusException(
+            InvalidPaymentStatusException ex, HttpServletRequest request) {
+
+        log.warn("Invalid payment status at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.badRequest(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Handle invalid refund exceptions.
+     * 
+     * @param ex      the InvalidRefundException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(InvalidRefundException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRefundException(
+            InvalidRefundException ex, HttpServletRequest request) {
+
+        log.warn("Invalid refund at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.badRequest(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Handle QR code generation exceptions.
+     * 
+     * @param ex      the QrCodeGenerationException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(QrCodeGenerationException.class)
+    public ResponseEntity<ErrorResponse> handleQrCodeGenerationException(
+            QrCodeGenerationException ex, HttpServletRequest request) {
+
+        log.error("QR code generation error at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.internalServerError(
+                "QR code generation failed", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+
+    // ==================== TOKEN-RELATED EXCEPTIONS ====================
+
+    /**
+     * Handle invalid token exceptions.
+     * 
+     * @param ex      the InvalidTokenException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidTokenException(
+            InvalidTokenException ex, HttpServletRequest request) {
+
+        log.warn("Invalid token at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.unauthorized(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    /**
+     * Handle token expired exceptions.
+     * 
+     * @param ex      the TokenExpiredException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(TokenExpiredException.class)
+    public ResponseEntity<ErrorResponse> handleTokenExpiredException(
+            TokenExpiredException ex, HttpServletRequest request) {
+
+        log.warn("Token expired at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.unauthorized(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    // ==================== ADDITIONAL EXCEPTION HANDLERS ====================
+
+    /**
+     * Handle authorization exceptions.
+     * 
+     * @param ex      the AuthorizationException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(AuthorizationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthorizationException(
+            AuthorizationException ex, HttpServletRequest request) {
+
+        log.warn("Authorization failed at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.forbidden(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    /**
+     * Handle insufficient permissions exceptions.
+     * 
+     * @param ex      the InsufficientPermissionsException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(InsufficientPermissionsException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientPermissionsException(
+            InsufficientPermissionsException ex, HttpServletRequest request) {
+
+        log.warn("Insufficient permissions at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.forbidden(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    /**
+     * Handle resource invalid exceptions.
+     * 
+     * @param ex      the ResourceInvalidException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(ResourceInvalidException.class)
+    public ResponseEntity<ErrorResponse> handleResourceInvalidException(
+            ResourceInvalidException ex, HttpServletRequest request) {
+
+        log.warn("Resource invalid at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.badRequest(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Handle generic resource exceptions.
+     * 
+     * @param ex      the ResourceException
+     * @param request the HTTP request
+     * @return standardized error response
+     */
+    @ExceptionHandler(ResourceException.class)
+    public ResponseEntity<ErrorResponse> handleResourceException(
+            ResourceException ex, HttpServletRequest request) {
+
+        log.warn("Resource error at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.badRequest(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
 }

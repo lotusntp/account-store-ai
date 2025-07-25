@@ -1,11 +1,17 @@
 package com.accountselling.platform.service.impl;
 
+import com.accountselling.platform.exception.InvalidTokenException;
+import com.accountselling.platform.exception.TokenExpiredException;
 import com.accountselling.platform.service.JwtTokenService;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -60,15 +66,28 @@ public class JwtTokenServiceImpl implements JwtTokenService {
 
     @Override
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        boolean isValid = username.equals(userDetails.getUsername()) && !isTokenExpired(token);
-        log.debug("Token validation for user {}: {}", userDetails.getUsername(), isValid);
-        return isValid;
+        try {
+            final String username = extractUsername(token);
+            boolean isValid = username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+            log.debug("Token validation for user {}: {}", userDetails.getUsername(), isValid);
+            return isValid;
+        } catch (TokenExpiredException | InvalidTokenException e) {
+            log.debug("Token validation failed for user {}: {}", userDetails.getUsername(), e.getMessage());
+            return false;
+        }
     }
 
     @Override
     public boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        try {
+            return extractExpiration(token).before(new Date());
+        } catch (TokenExpiredException e) {
+            // If token is expired, return true
+            return true;
+        } catch (InvalidTokenException e) {
+            // If token is invalid, we can't determine expiration, so treat as expired
+            return true;
+        }
     }
 
     @Override
@@ -86,6 +105,8 @@ public class JwtTokenServiceImpl implements JwtTokenService {
      * 
      * @param token the JWT token
      * @return the expiration date
+     * @throws TokenExpiredException if token is expired
+     * @throws InvalidTokenException if token is invalid
      */
     private Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
@@ -98,6 +119,8 @@ public class JwtTokenServiceImpl implements JwtTokenService {
      * @param claimsResolver function to extract the claim
      * @param <T> the type of the claim
      * @return the extracted claim
+     * @throws TokenExpiredException if token is expired
+     * @throws InvalidTokenException if token is invalid
      */
     private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
@@ -126,10 +149,12 @@ public class JwtTokenServiceImpl implements JwtTokenService {
     }
 
     /**
-     * Extract all claims from token.
+     * Extract all claims from token with proper exception handling.
      * 
      * @param token the JWT token
      * @return all claims
+     * @throws TokenExpiredException if token is expired
+     * @throws InvalidTokenException if token is invalid
      */
     private Claims extractAllClaims(String token) {
         try {
@@ -139,9 +164,24 @@ public class JwtTokenServiceImpl implements JwtTokenService {
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
+        } catch (ExpiredJwtException e) {
+            log.warn("JWT token is expired: {}", e.getMessage());
+            throw new TokenExpiredException("JWT token has expired");
+        } catch (MalformedJwtException e) {
+            log.error("Malformed JWT token: {}", e.getMessage());
+            throw new InvalidTokenException("JWT token is malformed");
+        } catch (SignatureException e) {
+            log.error("Invalid JWT signature: {}", e.getMessage());
+            throw new InvalidTokenException("JWT token signature is invalid");
+        } catch (UnsupportedJwtException e) {
+            log.error("Unsupported JWT token: {}", e.getMessage());
+            throw new InvalidTokenException("JWT token is unsupported");
+        } catch (IllegalArgumentException e) {
+            log.error("JWT token compact string is invalid: {}", e.getMessage());
+            throw new InvalidTokenException("JWT token is invalid");
         } catch (Exception e) {
-            log.error("Error extracting claims from token", e);
-            throw new IllegalArgumentException("Invalid JWT token", e);
+            log.error("Unexpected error extracting claims from token", e);
+            throw new InvalidTokenException("Failed to process JWT token: " + e.getMessage());
         }
     }
 

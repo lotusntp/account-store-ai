@@ -131,8 +131,8 @@ class StockServiceImplTest {
         
         // When & Then - Execute and verify exception
         assertThatThrownBy(() -> stockService.createStock(productId, credentials, null))
-            .isInstanceOf(ResourceAlreadyExistsException.class)
-            .hasMessageContaining("Credentials already exist for this product");
+            .isInstanceOf(StockException.class)
+            .hasMessageContaining("Stock with identical credentials already exists for this product");
         
         verify(productRepository).findById(productId);
         verify(stockRepository).existsByProductIdAndCredentials(productId, credentials);

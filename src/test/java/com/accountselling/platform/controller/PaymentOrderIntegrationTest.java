@@ -496,6 +496,6 @@ class PaymentOrderIntegrationTest {
         // Attempt to download another user's order - Should Fail
         mockMvc.perform(get("/api/orders/{orderId}/download", anotherOrder.getId()))
                 .andDo(print())
-                .andExpect(status().isNotFound()); // Service throws ResourceNotFoundException for unauthorized access
+                .andExpect(status().isForbidden()); // Service throws InsufficientPermissionsException for unauthorized access
     }
 }

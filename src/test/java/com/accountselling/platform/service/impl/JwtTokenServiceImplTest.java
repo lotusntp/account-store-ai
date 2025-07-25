@@ -1,5 +1,7 @@
 package com.accountselling.platform.service.impl;
 
+import com.accountselling.platform.exception.InvalidTokenException;
+import com.accountselling.platform.exception.TokenExpiredException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +21,7 @@ import static org.assertj.core.api.Assertions.*;
 /**
  * Unit tests for JwtTokenServiceImpl.
  * Tests JWT token generation, validation, and extraction functionality.
+ * Updated to test new exception handling with TokenExpiredException and InvalidTokenException.
  */
 @ExtendWith(MockitoExtension.class)
 class JwtTokenServiceImplTest {
@@ -86,12 +89,36 @@ class JwtTokenServiceImplTest {
     }
 
     @Test
-    void extractUsername_WithInvalidToken_ShouldThrowException() {
+    void extractUsername_WithInvalidToken_ShouldThrowInvalidTokenException() {
         String invalidToken = "invalid.token.here";
 
         assertThatThrownBy(() -> jwtTokenService.extractUsername(invalidToken))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid JWT token");
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessageContaining("JWT token is malformed");
+    }
+
+    @Test
+    void extractUsername_WithNullToken_ShouldThrowInvalidTokenException() {
+        assertThatThrownBy(() -> jwtTokenService.extractUsername(null))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessageContaining("JWT token is invalid");
+    }
+
+    @Test
+    void extractUsername_WithEmptyToken_ShouldThrowInvalidTokenException() {
+        assertThatThrownBy(() -> jwtTokenService.extractUsername(""))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessageContaining("JWT token is invalid");
+    }
+
+    @Test
+    void extractUsername_WithTamperedSignature_ShouldThrowInvalidTokenException() {
+        String token = jwtTokenService.generateAccessToken(userDetails);
+        String tamperedToken = token.substring(0, token.lastIndexOf('.')) + ".wrong_signature";
+
+        assertThatThrownBy(() -> jwtTokenService.extractUsername(tamperedToken))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessageContaining("JWT token signature is invalid");
     }
 
     @Test
@@ -119,12 +146,31 @@ class JwtTokenServiceImplTest {
     }
 
     @Test
-    void isTokenValid_WithInvalidToken_ShouldThrowException() {
+    void isTokenValid_WithInvalidToken_ShouldReturnFalse() {
         String invalidToken = "invalid.token.here";
 
-        assertThatThrownBy(() -> jwtTokenService.isTokenValid(invalidToken, userDetails))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid JWT token");
+        boolean isValid = jwtTokenService.isTokenValid(invalidToken, userDetails);
+
+        assertThat(isValid).isFalse();
+    }
+
+    @Test
+    void isTokenValid_WithExpiredToken_ShouldReturnFalse() {
+        // Create a token with very short expiration
+        ReflectionTestUtils.setField(jwtTokenService, "accessTokenExpiration", 1L); // 1ms
+        String expiredToken = jwtTokenService.generateAccessToken(userDetails);
+        
+        // Wait for token to expire
+        try {
+            Thread.sleep(10);
+        } catch (InterruptedException ignored) {}
+
+        // Reset expiration for other operations
+        ReflectionTestUtils.setField(jwtTokenService, "accessTokenExpiration", ACCESS_TOKEN_EXPIRATION);
+
+        boolean isValid = jwtTokenService.isTokenValid(expiredToken, userDetails);
+
+        assertThat(isValid).isFalse();
     }
 
     @Test
@@ -138,18 +184,30 @@ class JwtTokenServiceImplTest {
 
     @Test
     void isTokenExpired_WithExpiredToken_ShouldReturnTrue() {
-        ReflectionTestUtils.setField(jwtTokenService, "accessTokenExpiration", -1000L); // Expired 1 second ago
-        
+        // Create a token with very short expiration
+        ReflectionTestUtils.setField(jwtTokenService, "accessTokenExpiration", 1L); // 1ms
         String expiredToken = jwtTokenService.generateAccessToken(userDetails);
         
-        // Wait a moment to ensure token is expired
+        // Wait for token to expire
         try {
             Thread.sleep(10);
         } catch (InterruptedException ignored) {}
-        
-        assertThatThrownBy(() -> jwtTokenService.isTokenExpired(expiredToken))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid JWT token");
+
+        // Reset expiration for other operations
+        ReflectionTestUtils.setField(jwtTokenService, "accessTokenExpiration", ACCESS_TOKEN_EXPIRATION);
+
+        boolean isExpired = jwtTokenService.isTokenExpired(expiredToken);
+
+        assertThat(isExpired).isTrue();
+    }
+
+    @Test
+    void isTokenExpired_WithInvalidToken_ShouldReturnTrue() {
+        String invalidToken = "invalid.token.here";
+
+        boolean isExpired = jwtTokenService.isTokenExpired(invalidToken);
+
+        assertThat(isExpired).isTrue();
     }
 
     @Test
@@ -181,15 +239,36 @@ class JwtTokenServiceImplTest {
                 .isInstanceOf(NullPointerException.class);
     }
 
+    // Additional tests for comprehensive coverage of new exception handling
+
     @Test
-    void extractUsername_WithNullToken_ShouldThrowException() {
-        assertThatThrownBy(() -> jwtTokenService.extractUsername(null))
-                .isInstanceOf(IllegalArgumentException.class);
+    void extractUsername_FromExpiredToken_ShouldThrowTokenExpiredException() {
+        // Create a token with very short expiration
+        ReflectionTestUtils.setField(jwtTokenService, "accessTokenExpiration", 1L); // 1ms
+        String expiredToken = jwtTokenService.generateAccessToken(userDetails);
+        
+        // Wait for token to expire
+        try {
+            Thread.sleep(10);
+        } catch (InterruptedException ignored) {}
+
+        // Reset expiration for other operations
+        ReflectionTestUtils.setField(jwtTokenService, "accessTokenExpiration", ACCESS_TOKEN_EXPIRATION);
+
+        assertThatThrownBy(() -> jwtTokenService.extractUsername(expiredToken))
+                .isInstanceOf(TokenExpiredException.class)
+                .hasMessageContaining("JWT token has expired");
     }
 
     @Test
-    void extractUsername_WithEmptyToken_ShouldThrowException() {
-        assertThatThrownBy(() -> jwtTokenService.extractUsername(""))
-                .isInstanceOf(IllegalArgumentException.class);
+    void tokenValidation_HandlesExceptionsGracefully() {
+        // Test that validation methods handle exceptions gracefully and return false
+        // instead of throwing exceptions in isTokenValid and isTokenExpired methods
+        
+        String invalidToken = "completely.invalid.token";
+        
+        // These should not throw exceptions
+        assertThat(jwtTokenService.isTokenValid(invalidToken, userDetails)).isFalse();
+        assertThat(jwtTokenService.isTokenExpired(invalidToken)).isTrue();
     }
 }

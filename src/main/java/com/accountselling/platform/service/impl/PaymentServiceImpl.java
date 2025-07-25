@@ -91,6 +91,7 @@ public class PaymentServiceImpl implements PaymentService {
             } catch (Exception e) {
                 log.warn("Failed to mark order as processing: {}, continuing with payment creation", 
                         order.getOrderNumber(), e);
+                // Continue with payment creation even if order status update fails
             }
         }
         
@@ -281,8 +282,9 @@ public class PaymentServiceImpl implements PaymentService {
             } catch (Exception e) {
                 log.error("Failed to process order completion for payment: {}", 
                          payment.getPaymentReference(), e);
-                // Note: Payment is still marked as completed, but order processing failed
-                // This might require manual intervention or retry logic
+                // Payment is marked as completed, but order processing failed
+                // This creates an inconsistent state that may require manual intervention
+                throw new PaymentFailedException("Payment completed but order processing failed: " + e.getMessage());
             }
             
             log.info("Successfully marked payment as completed: {}", payment.getPaymentReference());
@@ -317,6 +319,7 @@ public class PaymentServiceImpl implements PaymentService {
             } catch (Exception e) {
                 log.error("Failed to process order failure for payment: {}", 
                          payment.getPaymentReference(), e);
+                // Continue with payment failure marking even if order update fails
             }
             
             log.info("Successfully marked payment as failed: {}", payment.getPaymentReference());
@@ -359,6 +362,7 @@ public class PaymentServiceImpl implements PaymentService {
             } catch (Exception e) {
                 log.error("Failed to cancel order for payment: {}", 
                          payment.getPaymentReference(), e);
+                // Continue with payment cancellation even if order update fails
             }
             
             log.info("Successfully cancelled payment: {}", payment.getPaymentReference());
@@ -480,10 +484,23 @@ public class PaymentServiceImpl implements PaymentService {
         
         try {
             // In a real implementation, this would make an API call to payment gateway
-            // For now, we'll simulate the response
-            // This is a mock implementation
+            // For now, we'll simulate the response with timeout simulation
+            
+            // Simulate potential timeout scenario
+            if (transactionId != null && transactionId.contains("timeout")) {
+                throw new PaymentTimeoutException("Gateway request timed out for transaction: " + transactionId);
+            }
+            
+            // Simulate gateway communication failure
+            if (transactionId != null && transactionId.contains("gateway_error")) {
+                throw new PaymentGatewayException("Gateway communication failed for transaction: " + transactionId);
+            }
+            
             return "COMPLETED"; // Simulated response
             
+        } catch (PaymentTimeoutException | PaymentGatewayException e) {
+            // Re-throw specific payment exceptions
+            throw e;
         } catch (Exception e) {
             log.error("Failed to check payment status with gateway for transaction: {}", transactionId, e);
             throw new PaymentGatewayException("Failed to check payment status: " + e.getMessage());
@@ -591,6 +608,7 @@ public class PaymentServiceImpl implements PaymentService {
                     } catch (Exception e) {
                         log.error("Failed to process order failure for expired payment: {}", 
                                  payment.getPaymentReference(), e);
+                        // Continue processing other expired payments even if one fails
                     }
                 }
             }

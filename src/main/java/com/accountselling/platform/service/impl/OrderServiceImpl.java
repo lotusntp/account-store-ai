@@ -282,7 +282,7 @@ public class OrderServiceImpl implements OrderService {
         
         if (!order.belongsToUser(user)) {
             log.error("User {} does not own order: {}", user.getUsername(), order.getOrderNumber());
-            throw new UnauthorizedException("User does not have permission to cancel this order");
+            throw new InsufficientPermissionsException("User does not have permission to cancel this order");
         }
         
         return cancelOrder(orderId, reason);
@@ -585,7 +585,7 @@ public class OrderServiceImpl implements OrderService {
         // Verify order belongs to user
         if (!order.belongsToUser(user)) {
             log.error("User {} does not own order: {}", user.getUsername(), order.getOrderNumber());
-            throw new UnauthorizedException("User does not have permission to access this order");
+            throw new InsufficientPermissionsException("User does not have permission to access this order");
         }
         
         // Verify order is completed
