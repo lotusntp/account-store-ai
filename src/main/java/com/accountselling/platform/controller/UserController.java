@@ -4,7 +4,6 @@ import com.accountselling.platform.dto.user.UserOrderHistoryDto;
 import com.accountselling.platform.dto.user.UserProfileResponseDto;
 import com.accountselling.platform.exception.OrderAccessDeniedException;
 import com.accountselling.platform.exception.OrderNotCompletedException;
-import com.accountselling.platform.exception.ResourceNotFoundException;
 import com.accountselling.platform.exception.UserNotFoundException;
 import com.accountselling.platform.model.Order;
 import com.accountselling.platform.model.OrderItem;
@@ -23,17 +22,16 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -83,8 +81,7 @@ public class UserController {
             .firstName(user.getFirstName())
             .lastName(user.getLastName())
             .fullName(user.getFullName())
-            .roles(
-                user.getRoles().stream().map(role -> role.getName()).collect(Collectors.toSet()))
+            .roles(user.getRoles().stream().map(role -> role.getName()).collect(Collectors.toSet()))
             .enabled(user.getEnabled())
             .createdAt(user.getCreatedAt())
             .updatedAt(user.getUpdatedAt())
@@ -127,8 +124,10 @@ public class UserController {
 
     // Create pageable with sorting
     String[] sortParams = sort.split(",");
-    Sort.Direction direction = sortParams.length > 1 && "desc".equalsIgnoreCase(sortParams[1]) 
-        ? Sort.Direction.DESC : Sort.Direction.ASC;
+    Sort.Direction direction =
+        sortParams.length > 1 && "desc".equalsIgnoreCase(sortParams[1])
+            ? Sort.Direction.DESC
+            : Sort.Direction.ASC;
     Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParams[0]));
 
     // Get user's orders and convert to DTOs
@@ -171,8 +170,7 @@ public class UserController {
             responseCode = "400",
             description = "Order not completed or no downloadable content")
       })
-  public ResponseEntity<String> downloadOrderAccountData(
-      @PathVariable UUID orderId) {
+  public ResponseEntity<String> downloadOrderAccountData(@PathVariable UUID orderId) {
     log.info("Processing account data download request for order: {}", orderId);
 
     User user = getCurrentAuthenticatedUser();
@@ -200,8 +198,10 @@ public class UserController {
     accountData.append("Order ID: ").append(order.getId()).append("\n");
     accountData
         .append("Order Date: ")
-        .append(order.getCreatedAt() != null ? 
-            order.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : "N/A")
+        .append(
+            order.getCreatedAt() != null
+                ? order.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                : "N/A")
         .append("\n");
     accountData.append("Customer: ").append(user.getUsername()).append("\n");
     accountData.append("Total Amount: $").append(order.getTotalAmount()).append("\n\n");
@@ -240,7 +240,8 @@ public class UserController {
     // Set response headers for file download
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.valueOf("text/plain;charset=UTF-8"));
-    headers.add("Content-Disposition", "attachment; filename=\"accounts_order_" + orderId + ".txt\"");
+    headers.add(
+        "Content-Disposition", "attachment; filename=\"accounts_order_" + orderId + ".txt\"");
 
     log.info(
         "Account data download completed for user: {}, order: {}", user.getUsername(), orderId);

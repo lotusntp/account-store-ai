@@ -569,6 +569,61 @@ class GlobalExceptionHandlerTest {
     assertThat(response.getBody().message()).isEqualTo("User not found");
   }
 
+  @Test
+  @DisplayName("Handle InsufficientPermissionsException - Success")
+  void handleInsufficientPermissionsException_Success() {
+    // Arrange
+    InsufficientPermissionsException exception = 
+        new InsufficientPermissionsException("Insufficient permissions to access this resource");
+
+    // Act
+    ResponseEntity<ErrorResponse> response =
+        globalExceptionHandler.handleInsufficientPermissionsException(exception, request);
+
+    // Assert
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(403);
+    assertThat(response.getBody().error()).isEqualTo("Forbidden");
+    assertThat(response.getBody().message()).isEqualTo("Insufficient permissions to access this resource");
+  }
+
+  @Test
+  @DisplayName("Handle ResourceInvalidException - Success")
+  void handleResourceInvalidException_Success() {
+    // Arrange
+    ResourceInvalidException exception = new ResourceInvalidException("Resource validation failed");
+
+    // Act
+    ResponseEntity<ErrorResponse> response =
+        globalExceptionHandler.handleResourceInvalidException(exception, request);
+
+    // Assert
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(400);
+    assertThat(response.getBody().error()).isEqualTo("Bad Request");
+    assertThat(response.getBody().message()).isEqualTo("Resource validation failed");
+  }
+
+  @Test
+  @DisplayName("Handle ResourceException - Success")
+  void handleResourceException_Success() {
+    // Arrange
+    ResourceException exception = new ResourceException("Generic resource error");
+
+    // Act
+    ResponseEntity<ErrorResponse> response =
+        globalExceptionHandler.handleResourceException(exception, request);
+
+    // Assert
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(400);
+    assertThat(response.getBody().error()).isEqualTo("Bad Request");
+    assertThat(response.getBody().message()).isEqualTo("Generic resource error");
+  }
+
   // ==================== ERROR RESPONSE STRUCTURE TESTS ====================
 
   @Test

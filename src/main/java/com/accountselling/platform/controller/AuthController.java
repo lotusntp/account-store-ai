@@ -62,8 +62,7 @@ public class AuthController {
         @ApiResponse(responseCode = "400", description = "Invalid input data"),
         @ApiResponse(responseCode = "409", description = "Username already exists")
       })
-  public ResponseEntity<AuthResponseDto> register(
-      @Valid @RequestBody RegisterRequestDto request) {
+  public ResponseEntity<AuthResponseDto> register(@Valid @RequestBody RegisterRequestDto request) {
     log.info("Processing user registration for username: {}", request.getUsername());
 
     // Check if username already exists
@@ -114,8 +113,7 @@ public class AuthController {
         @ApiResponse(responseCode = "401", description = "Invalid credentials"),
         @ApiResponse(responseCode = "400", description = "Invalid input data")
       })
-  public ResponseEntity<AuthResponseDto> login(
-      @Valid @RequestBody LoginRequestDto request) {
+  public ResponseEntity<AuthResponseDto> login(@Valid @RequestBody LoginRequestDto request) {
     log.info("Processing login request for username: {}", request.getUsername());
 
     try {
