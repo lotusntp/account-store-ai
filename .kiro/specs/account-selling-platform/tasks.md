@@ -157,7 +157,7 @@
     - Write integration tests for controllers
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-  - [ ] 5.4 Implement admin controllers
+  - [x] 5.4 Implement admin controllers
 
     - Create AdminCategoryController
     - Create AdminProductController
