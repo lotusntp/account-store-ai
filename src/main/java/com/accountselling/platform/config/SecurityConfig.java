@@ -67,6 +67,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/products/**")
                     .permitAll()
+                    .requestMatchers("/api/payments/webhook")
+                    .permitAll() // Allow webhook without authentication
                     .requestMatchers("/api-docs/**")
                     .permitAll()
                     .requestMatchers("/swagger-ui/**")
