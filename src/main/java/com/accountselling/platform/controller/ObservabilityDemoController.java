@@ -1,7 +1,5 @@
 package com.accountselling.platform.controller;
 
-import io.micrometer.tracing.Span;
-import io.micrometer.tracing.Tracer;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -21,8 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ObservabilityDemoController {
 
-  private final Tracer tracer;
-
   @GetMapping("/trace")
   public ResponseEntity<Map<String, String>> traceDemo() {
     log.info("Received request to trace demo endpoint");
@@ -33,21 +29,5 @@ public class ObservabilityDemoController {
     response.put("message", "Trace created successfully");
 
     return ResponseEntity.ok(response);
-  }
-
-  private void performTracedOperation() {
-    Span span = tracer.nextSpan().name("traced-operation");
-    try (Tracer.SpanInScope ws = tracer.withSpan(span.start())) {
-      log.info("Performing traced operation");
-      // Simulate work
-      try {
-        Thread.sleep(100);
-      } catch (InterruptedException e) {
-        log.error("Operation interrupted", e);
-        Thread.currentThread().interrupt();
-      }
-    } finally {
-      span.end();
-    }
   }
 }

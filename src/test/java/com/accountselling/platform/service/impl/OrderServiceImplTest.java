@@ -312,7 +312,7 @@ class OrderServiceImplTest {
 
     // Act & Assert
     assertThrows(
-        UnauthorizedException.class,
+        InsufficientPermissionsException.class,
         () -> orderService.cancelOrderByUser(testOrder.getId(), otherUser, "User cancelled"));
   }
 
@@ -569,7 +569,7 @@ class OrderServiceImplTest {
 
     // Act & Assert
     assertThrows(
-        UnauthorizedException.class,
+        InsufficientPermissionsException.class,
         () -> orderService.getOrderDownloadInfo(testOrder.getId(), otherUser));
   }
 
