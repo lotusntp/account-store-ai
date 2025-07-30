@@ -8,6 +8,10 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -25,7 +29,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -45,6 +49,24 @@ public class SecurityConfig {
   }
 
   @Bean
+  public RoleHierarchy roleHierarchy() {
+    RoleHierarchyImpl roleHierarchy = new RoleHierarchyImpl();
+    // ADMIN role has all privileges of USER role
+    // SUPER_ADMIN role has all privileges of ADMIN role (for future extension)
+    String hierarchy = "ROLE_SUPER_ADMIN > ROLE_ADMIN \n ROLE_ADMIN > ROLE_USER";
+    roleHierarchy.setHierarchy(hierarchy);
+    return roleHierarchy;
+  }
+
+  @Bean
+  public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
+    DefaultMethodSecurityExpressionHandler expressionHandler =
+        new DefaultMethodSecurityExpressionHandler();
+    expressionHandler.setRoleHierarchy(roleHierarchy());
+    return expressionHandler;
+  }
+
+  @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .csrf(AbstractHttpConfigurer::disable) // Disable CSRF for REST API
@@ -54,7 +76,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth
-                    // Public endpoints
+                    // Public endpoints - accessible by anyone
                     .requestMatchers("/api/auth/**")
                     .permitAll()
                     .requestMatchers("/api/categories/**")
@@ -73,7 +95,20 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/observability/**")
                     .permitAll()
-                    // Protected endpoints
+
+                    // Admin endpoints - require ADMIN role
+                    .requestMatchers("/api/admin/**")
+                    .hasRole("ADMIN")
+
+                    // User profile and orders - require USER role (ADMIN inherits this)
+                    .requestMatchers("/api/users/**")
+                    .hasRole("USER")
+
+                    // Payment endpoints (except webhook) - require USER role
+                    .requestMatchers("/api/payments/**")
+                    .hasRole("USER")
+
+                    // All other endpoints require authentication
                     .anyRequest()
                     .authenticated());
 

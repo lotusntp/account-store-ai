@@ -4,6 +4,8 @@ import com.accountselling.platform.model.User;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetailsService;
 
 /**
@@ -154,9 +156,41 @@ public interface UserService extends UserDetailsService {
   /**
    * Find all users with pagination support.
    *
+   * @param pageable pagination parameters
+   * @return page of users
+   */
+  Page<User> findAllUsers(Pageable pageable);
+
+  /**
+   * Find all users with pagination support.
+   *
    * @return list of all users
    */
   List<User> findAllUsers();
+
+  /**
+   * Update user account status (enabled/disabled).
+   *
+   * @param userId the user ID as string
+   * @param enabled the enabled status
+   * @return the updated user
+   * @throws IllegalArgumentException if user not found
+   */
+  User updateUserStatus(String userId, boolean enabled);
+
+  /**
+   * Count all users in the system.
+   *
+   * @return total number of users
+   */
+  long countAllUsers();
+
+  /**
+   * Count active (enabled) users in the system.
+   *
+   * @return number of active users
+   */
+  long countActiveUsers();
 
   /**
    * Find users by enabled status.

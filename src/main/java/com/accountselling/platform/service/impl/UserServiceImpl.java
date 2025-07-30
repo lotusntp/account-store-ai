@@ -15,6 +15,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -313,6 +315,51 @@ public class UserServiceImpl implements UserService {
   @Override
   @Transactional(readOnly = true)
   public long getEnabledUserCount() {
+    return userRepository.countByEnabled(true);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<User> findAllUsers(Pageable pageable) {
+    return userRepository.findAll(pageable);
+  }
+
+  @Override
+  @Transactional
+  public User updateUserStatus(String userId, boolean enabled) {
+    UUID userUuid;
+    try {
+      userUuid = UUID.fromString(userId);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Invalid user ID format: " + userId);
+    }
+
+    User user =
+        userRepository
+            .findById(userUuid)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+    user.setEnabled(enabled);
+    User updatedUser = userRepository.save(user);
+
+    log.info(
+        "User status updated - ID: {}, Username: {}, Enabled: {}",
+        userId,
+        user.getUsername(),
+        enabled);
+
+    return updatedUser;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public long countAllUsers() {
+    return userRepository.count();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public long countActiveUsers() {
     return userRepository.countByEnabled(true);
   }
 

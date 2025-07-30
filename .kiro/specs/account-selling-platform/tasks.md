@@ -184,7 +184,7 @@
     - Write tests for authentication filter
     - _Requirements: 6.1, 6.2_
 
-  - [ ] 6.2 Implement role-based access control
+  - [x] 6.2 Implement role-based access control
 
     - Configure method security
     - Set up URL-based security
