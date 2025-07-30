@@ -411,12 +411,12 @@ class ProductRepositoryTest {
     // Add 2 available stock items (below threshold)
     Stock stock1 = new Stock();
     stock1.setProduct(activeProduct);
-    stock1.setCredentials("encrypted_credentials_1");
+    stock1.setAccountData("encrypted_credentials_1");
     stock1.setSold(false);
 
     Stock stock2 = new Stock();
     stock2.setProduct(activeProduct);
-    stock2.setCredentials("encrypted_credentials_2");
+    stock2.setAccountData("encrypted_credentials_2");
     stock2.setSold(false);
 
     entityManager.persistAndFlush(stock1);
@@ -439,7 +439,7 @@ class ProductRepositoryTest {
     // Add only sold stock items
     Stock soldStock = new Stock();
     soldStock.setProduct(activeProduct);
-    soldStock.setCredentials("encrypted_credentials");
+    soldStock.setAccountData("encrypted_credentials");
     soldStock.setSold(true);
     entityManager.persistAndFlush(soldStock);
 
@@ -460,7 +460,7 @@ class ProductRepositoryTest {
     // Add available stock
     Stock availableStock = new Stock();
     availableStock.setProduct(activeProduct);
-    availableStock.setCredentials("encrypted_credentials");
+    availableStock.setAccountData("encrypted_credentials");
     availableStock.setSold(false);
     entityManager.persistAndFlush(availableStock);
 
@@ -482,7 +482,7 @@ class ProductRepositoryTest {
     // Add available stock
     Stock availableStock = new Stock();
     availableStock.setProduct(activeProduct);
-    availableStock.setCredentials("encrypted_credentials");
+    availableStock.setAccountData("encrypted_credentials");
     availableStock.setSold(false);
     entityManager.persistAndFlush(availableStock);
 

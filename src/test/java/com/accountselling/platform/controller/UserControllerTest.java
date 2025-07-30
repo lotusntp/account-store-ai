@@ -207,7 +207,7 @@ class UserControllerTest {
         .andExpect(content().string(containsString("Order ID: " + order.getId())))
         .andExpect(content().string(containsString("Customer: " + testUser.getUsername())))
         .andExpect(content().string(containsString(product.getName())))
-        .andExpect(content().string(containsString(stock.getCredentials())));
+        .andExpect(content().string(containsString(stock.getAccountData())));
   }
 
   @Test
@@ -310,7 +310,7 @@ class UserControllerTest {
   private Stock createTestStock(Product product) {
     Stock stock = new Stock();
     stock.setProduct(product);
-    stock.setCredentials("username:testuser\npassword:testpass123");
+    stock.setAccountData("username:testuser\npassword:testpass123");
     stock.setSold(false);
     return stockRepository.save(stock);
   }

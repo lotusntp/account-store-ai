@@ -101,7 +101,7 @@ class OrderControllerTest {
     testStock = new Stock();
     testStock.setId(UUID.randomUUID());
     testStock.setProduct(testProduct);
-    testStock.setCredentials("username:password123");
+    testStock.setAccountData("username:password123");
     testStock.setReservedUntil(null);
     testStock.setSold(false);
 

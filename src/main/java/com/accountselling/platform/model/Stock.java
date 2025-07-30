@@ -28,7 +28,7 @@ import lombok.*;
 @NoArgsConstructor
 @ToString(
     callSuper = true,
-    exclude = {"product", "credentials"})
+    exclude = {"product", "accountData"})
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Stock extends BaseEntity {
 
@@ -37,11 +37,21 @@ public class Stock extends BaseEntity {
   @NotNull(message = "Stock must be associated with a product")
   private Product product;
 
-  @NotBlank(message = "Credentials cannot be blank")
-  @Size(max = 1000, message = "Credentials cannot exceed 1000 characters")
-  @Column(name = "credentials", nullable = false, length = 1000)
+  @NotBlank(message = "Account data cannot be blank")
+  @Size(max = 2000, message = "Account data cannot exceed 2000 characters")
+  @Column(name = "account_data", nullable = false, length = 2000)
   @EqualsAndHashCode.Include
-  private String credentials;
+  private String accountData;
+
+  @Size(max = 100, message = "Account type cannot exceed 100 characters")
+  @Column(name = "account_type", length = 100)
+  private String accountType;
+
+  @Column(name = "price")
+  private Double price;
+
+  @Column(name = "available", nullable = false)
+  private Boolean available = true;
 
   @Column(name = "sold", nullable = false)
   private Boolean sold = false;
@@ -56,17 +66,25 @@ public class Stock extends BaseEntity {
   @Column(name = "sold_at")
   private LocalDateTime soldAt;
 
-  // Constructor with product and credentials
-  public Stock(Product product, String credentials) {
+  // Constructor with product and account data
+  public Stock(Product product, String accountData) {
     this.product = product;
-    this.credentials = credentials;
+    this.accountData = accountData;
   }
 
-  // Constructor with product, credentials, and additional info
-  public Stock(Product product, String credentials, String additionalInfo) {
+  // Constructor with product, account data, and additional info
+  public Stock(Product product, String accountData, String additionalInfo) {
     this.product = product;
-    this.credentials = credentials;
+    this.accountData = accountData;
     this.additionalInfo = additionalInfo;
+  }
+
+  // Constructor with all main fields
+  public Stock(Product product, String accountData, String accountType, Double price) {
+    this.product = product;
+    this.accountData = accountData;
+    this.accountType = accountType;
+    this.price = price;
   }
 
   // Business logic methods
@@ -75,7 +93,7 @@ public class Stock extends BaseEntity {
   }
 
   public boolean isAvailable() {
-    return !sold && !isReserved();
+    return available && !sold && !isReserved();
   }
 
   public boolean isExpiredReservation() {
@@ -109,8 +127,22 @@ public class Stock extends BaseEntity {
       throw new IllegalStateException("Stock item is already sold");
     }
     this.sold = true;
+    this.available = false;
     this.soldAt = LocalDateTime.now();
     this.reservedUntil = null; // Clear any reservation
+  }
+
+  // Mark as unavailable (disable without selling)
+  public void markAsUnavailable() {
+    this.available = false;
+  }
+
+  // Mark as available (re-enable)
+  public void markAsAvailable() {
+    if (sold) {
+      throw new IllegalStateException("Cannot make sold stock item available");
+    }
+    this.available = true;
   }
 
   // Get remaining reservation time in minutes
@@ -134,6 +166,8 @@ public class Stock extends BaseEntity {
   public String getStatusDisplay() {
     if (sold) {
       return "SOLD";
+    } else if (!available) {
+      return "UNAVAILABLE";
     } else if (isReserved()) {
       return "RESERVED";
     } else {

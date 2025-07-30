@@ -84,7 +84,7 @@ class AdminStockControllerTest {
     testStock = new Stock();
     testStock.setId(UUID.fromString("123e4567-e89b-12d3-a456-426614174002"));
     testStock.setProduct(testProduct);
-    testStock.setCredentials("username:player123\npassword:secret456\nemail:player@example.com");
+    testStock.setAccountData("username:player123\npassword:secret456\nemail:player@example.com");
     testStock.setAdditionalInfo("Level 80 character with rare items");
     testStock.setSold(false);
     testStock.setReservedUntil(null);

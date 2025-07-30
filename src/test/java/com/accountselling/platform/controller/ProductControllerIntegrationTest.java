@@ -159,20 +159,20 @@ class ProductControllerIntegrationTest {
     // Create stock for WoW product
     wowStock1 = new Stock();
     wowStock1.setProduct(wowProduct);
-    wowStock1.setCredentials("wow_user1:password123");
+    wowStock1.setAccountData("wow_user1:password123");
     wowStock1.setSold(false);
     wowStock1 = stockRepository.save(wowStock1);
 
     wowStock2 = new Stock();
     wowStock2.setProduct(wowProduct);
-    wowStock2.setCredentials("wow_user2:password456");
+    wowStock2.setAccountData("wow_user2:password456");
     wowStock2.setSold(true);
     wowStock2 = stockRepository.save(wowStock2);
 
     // Create stock for CS:GO product
     csgoStock = new Stock();
     csgoStock.setProduct(csgoProduct);
-    csgoStock.setCredentials("csgo_user1:password789");
+    csgoStock.setAccountData("csgo_user1:password789");
     csgoStock.setSold(false);
     csgoStock = stockRepository.save(csgoStock);
   }

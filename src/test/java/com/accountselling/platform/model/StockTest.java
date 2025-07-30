@@ -33,7 +33,7 @@ class StockTest {
 
     assertNotNull(newStock);
     assertNull(newStock.getProduct());
-    assertNull(newStock.getCredentials());
+    assertNull(newStock.getAccountData());
     assertFalse(newStock.getSold());
     assertNull(newStock.getReservedUntil());
     assertNull(newStock.getAdditionalInfo());
@@ -46,7 +46,7 @@ class StockTest {
     Stock newStock = new Stock(product, "username:password");
 
     assertEquals(product, newStock.getProduct());
-    assertEquals("username:password", newStock.getCredentials());
+    assertEquals("username:password", newStock.getAccountData());
     assertFalse(newStock.getSold());
   }
 
@@ -56,7 +56,7 @@ class StockTest {
     Stock newStock = new Stock(product, "username:password", "Level 50 character");
 
     assertEquals(product, newStock.getProduct());
-    assertEquals("username:password", newStock.getCredentials());
+    assertEquals("username:password", newStock.getAccountData());
     assertEquals("Level 50 character", newStock.getAdditionalInfo());
     assertFalse(newStock.getSold());
   }
@@ -70,7 +70,7 @@ class StockTest {
 
     stock.setId(id);
     stock.setProduct(product);
-    stock.setCredentials("test:credentials");
+    stock.setAccountData("test:credentials");
     stock.setSold(true);
     stock.setReservedUntil(reservedUntil);
     stock.setAdditionalInfo("Additional information");
@@ -78,7 +78,7 @@ class StockTest {
 
     assertEquals(id, stock.getId());
     assertEquals(product, stock.getProduct());
-    assertEquals("test:credentials", stock.getCredentials());
+    assertEquals("test:credentials", stock.getAccountData());
     assertTrue(stock.getSold());
     assertEquals(reservedUntil, stock.getReservedUntil());
     assertEquals("Additional information", stock.getAdditionalInfo());
@@ -296,7 +296,7 @@ class StockTest {
   @Test
   @DisplayName("Should implement toString correctly")
   void shouldImplementToStringCorrectly() {
-    stock.setCredentials("test:credentials");
+    stock.setAccountData("test:credentials");
     stock.setSold(false);
 
     String toString = stock.toString();
@@ -314,7 +314,7 @@ class StockTest {
     Stock newStock = new Stock();
 
     assertNull(newStock.getProduct());
-    assertNull(newStock.getCredentials());
+    assertNull(newStock.getAccountData());
     assertNull(newStock.getReservedUntil());
 
     // Should not throw exceptions

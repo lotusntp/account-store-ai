@@ -28,15 +28,15 @@ class ProductTest {
     stock3 = new Stock();
 
     // Set up stock items with different states and unique credentials
-    stock1.setCredentials("user1:pass1");
+    stock1.setAccountData("user1:pass1");
     stock1.setSold(false);
     stock1.setReservedUntil(null);
 
-    stock2.setCredentials("user2:pass2");
+    stock2.setAccountData("user2:pass2");
     stock2.setSold(true);
     stock2.setSoldAt(LocalDateTime.now());
 
-    stock3.setCredentials("user3:pass3");
+    stock3.setAccountData("user3:pass3");
     stock3.setSold(false);
     stock3.setReservedUntil(LocalDateTime.now().plusMinutes(30));
   }
@@ -220,7 +220,7 @@ class ProductTest {
     assertTrue(product.isLowStock());
 
     Stock stock4 = new Stock();
-    stock4.setCredentials("user4:pass4");
+    stock4.setAccountData("user4:pass4");
     stock4.setSold(false);
     stock4.setReservedUntil(null);
     product.addStockItem(stock4); // 2 available
@@ -228,7 +228,7 @@ class ProductTest {
     assertTrue(product.isLowStock()); // Equal to threshold
 
     Stock stock5 = new Stock();
-    stock5.setCredentials("user5:pass5");
+    stock5.setAccountData("user5:pass5");
     stock5.setSold(false);
     stock5.setReservedUntil(null);
     product.addStockItem(stock5); // 3 available

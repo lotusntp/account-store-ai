@@ -493,7 +493,7 @@ public class AdminStockController {
                 .categoryName(stock.getProduct().getCategory().getName())
                 .active(stock.getProduct().getActive())
                 .build())
-        .maskedCredentials(maskCredentials(stock.getCredentials()))
+        .maskedCredentials(maskCredentials(stock.getAccountData()))
         .additionalInfo(stock.getAdditionalInfo())
         .sold(stock.getSold())
         .soldAt(stock.getSoldAt())

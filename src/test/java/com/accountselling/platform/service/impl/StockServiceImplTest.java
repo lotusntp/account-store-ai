@@ -88,7 +88,7 @@ class StockServiceImplTest {
     // Then - Verify results
     assertThat(result).isNotNull();
     assertThat(result.getId()).isEqualTo(stockId);
-    assertThat(result.getCredentials()).isEqualTo("encrypted_credentials_123");
+    assertThat(result.getAccountData()).isEqualTo("encrypted_credentials_123");
 
     verify(productRepository).findById(productId);
     verify(stockRepository).existsByProductIdAndCredentials(productId, credentials);
@@ -152,7 +152,7 @@ class StockServiceImplTest {
 
     // Then - Verify results
     assertThat(result).hasSize(3);
-    assertThat(result).extracting(Stock::getCredentials).containsExactly("cred1", "cred2", "cred3");
+    assertThat(result).extracting(Stock::getAccountData).containsExactly("cred1", "cred2", "cred3");
 
     verify(productRepository).findById(productId);
     verify(stockRepository, times(3)).existsByProductIdAndCredentials(eq(productId), anyString());

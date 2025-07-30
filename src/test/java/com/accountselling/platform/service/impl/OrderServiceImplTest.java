@@ -60,7 +60,7 @@ class OrderServiceImplTest {
     testStock = new Stock();
     testStock.setId(UUID.randomUUID());
     testStock.setProduct(testProduct);
-    testStock.setCredentials("test-credentials");
+    testStock.setAccountData("test-credentials");
     testStock.setSold(false);
 
     testOrder = new Order(testUser, BigDecimal.valueOf(100.00));
@@ -553,7 +553,7 @@ class OrderServiceImplTest {
     // Assert
     assertNotNull(result);
     assertTrue(result.containsKey(testProduct.getName()));
-    assertEquals(testStock.getCredentials(), result.get(testProduct.getName()));
+    assertEquals(testStock.getAccountData(), result.get(testProduct.getName()));
   }
 
   @Test

@@ -225,7 +225,7 @@ public class UserController {
         if (accountCount >= 1) break;
 
         accountData.append("Account #").append(++accountCount).append(":\n");
-        accountData.append(stock.getCredentials()).append("\n\n");
+        accountData.append(stock.getAccountData()).append("\n\n");
       }
     }
 

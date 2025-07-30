@@ -144,7 +144,7 @@ class PaymentOrderIntegrationTest {
     // Create test stock
     testStock = new Stock();
     testStock.setProduct(testProduct);
-    testStock.setCredentials(
+    testStock.setAccountData(
         "username:gameuser123\npassword:gamepass456\nemail:gameuser@example.com");
     testStock.setReservedUntil(null);
     testStock.setSold(false);

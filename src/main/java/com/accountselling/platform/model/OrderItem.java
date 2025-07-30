@@ -115,7 +115,7 @@ public class OrderItem extends BaseEntity {
   }
 
   public String getStockCredentials() {
-    return stockItem != null ? stockItem.getCredentials() : null;
+    return stockItem != null ? stockItem.getAccountData() : null;
   }
 
   public String getStockAdditionalInfo() {

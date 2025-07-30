@@ -97,7 +97,7 @@ class StockRepositoryTest {
     // Then
     assertThat(result).hasSize(3); // 2 available + 1 sold
     assertThat(result)
-        .extracting(Stock::getCredentials)
+        .extracting(Stock::getAccountData)
         .containsExactlyInAnyOrder(
             "username1:password1", "username2:password2", "username3:password3");
   }
@@ -141,7 +141,7 @@ class StockRepositoryTest {
     // Then
     assertThat(result).hasSize(3); // 2 from product1 + 1 expired reservation from product2
     assertThat(result)
-        .extracting(Stock::getCredentials)
+        .extracting(Stock::getAccountData)
         .containsExactlyInAnyOrder(
             "username1:password1", "username2:password2", "username5:password5");
   }
@@ -155,7 +155,7 @@ class StockRepositoryTest {
     // Then
     assertThat(result).hasSize(2);
     assertThat(result)
-        .extracting(Stock::getCredentials)
+        .extracting(Stock::getAccountData)
         .containsExactlyInAnyOrder("username1:password1", "username2:password2");
     assertThat(result)
         .allSatisfy(
@@ -238,7 +238,7 @@ class StockRepositoryTest {
 
     // Then
     assertThat(result).hasSize(1);
-    assertThat(result.get(0).getCredentials()).isEqualTo("username3:password3");
+    assertThat(result.get(0).getAccountData()).isEqualTo("username3:password3");
     assertThat(result.get(0).getSold()).isTrue();
     assertThat(result.get(0).getSoldAt()).isNotNull();
   }
@@ -251,7 +251,7 @@ class StockRepositoryTest {
 
     // Then
     assertThat(result).hasSize(1);
-    assertThat(result.get(0).getCredentials()).isEqualTo("username3:password3");
+    assertThat(result.get(0).getAccountData()).isEqualTo("username3:password3");
     assertThat(result.get(0).getProduct().getId()).isEqualTo(testProduct1.getId());
   }
 
@@ -267,7 +267,7 @@ class StockRepositoryTest {
 
     // Then
     assertThat(result).hasSize(1);
-    assertThat(result.get(0).getCredentials()).isEqualTo("username3:password3");
+    assertThat(result.get(0).getAccountData()).isEqualTo("username3:password3");
     assertThat(result.get(0).getSoldAt()).isBetween(startDate, endDate);
   }
 
@@ -298,7 +298,7 @@ class StockRepositoryTest {
 
     // Then
     assertThat(result).hasSize(1);
-    assertThat(result.get(0).getCredentials()).isEqualTo("username4:password4");
+    assertThat(result.get(0).getAccountData()).isEqualTo("username4:password4");
     assertThat(result.get(0).isReserved()).isTrue();
   }
 
@@ -322,7 +322,7 @@ class StockRepositoryTest {
 
     // Then
     assertThat(result).hasSize(1);
-    assertThat(result.get(0).getCredentials()).isEqualTo("username5:password5");
+    assertThat(result.get(0).getAccountData()).isEqualTo("username5:password5");
     assertThat(result.get(0).isExpiredReservation()).isTrue();
   }
 
@@ -337,7 +337,7 @@ class StockRepositoryTest {
 
     // Then
     assertThat(result).hasSize(1);
-    assertThat(result.get(0).getCredentials()).isEqualTo("username4:password4");
+    assertThat(result.get(0).getAccountData()).isEqualTo("username4:password4");
     assertThat(result.get(0).getReservedUntil()).isBefore(threshold);
   }
 
@@ -499,7 +499,7 @@ class StockRepositoryTest {
     assertThat(result).isPresent();
     assertThat(result.get().getSold()).isFalse();
     // Should be either availableStock1 or availableStock2 (oldest created)
-    assertThat(result.get().getCredentials()).isIn("username1:password1", "username2:password2");
+    assertThat(result.get().getAccountData()).isIn("username1:password1", "username2:password2");
   }
 
   @Test

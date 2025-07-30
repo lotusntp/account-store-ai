@@ -9,7 +9,8 @@
       "Bash(mkdir:*)",
       "Bash(mvn:*)",
       "Bash(grep:*)",
-      "Bash(mvn*)"
+      "Bash(mvn*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }
