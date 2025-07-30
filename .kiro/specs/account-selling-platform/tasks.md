@@ -191,7 +191,7 @@
     - Write tests for authorization
     - _Requirements: 6.3, 6.5_
 
-  - [ ] 6.3 Implement rate limiting
+  - [x] 6.3 Implement rate limiting
 
     - Create rate limiting filter
     - Configure rate limits for endpoints
