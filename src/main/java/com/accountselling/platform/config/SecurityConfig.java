@@ -2,7 +2,6 @@ package com.accountselling.platform.config;
 
 import com.accountselling.platform.security.JwtAuthenticationEntryPoint;
 import com.accountselling.platform.security.JwtAuthenticationFilter;
-import com.accountselling.platform.security.JwtTokenProvider;
 import com.accountselling.platform.security.RateLimitingFilter;
 import java.util.Arrays;
 import java.util.List;
@@ -31,13 +30,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
   private final JwtAuthenticationEntryPoint unauthorizedHandler;
-  private final JwtTokenProvider tokenProvider;
+  private final JwtAuthenticationFilter jwtAuthenticationFilter;
   private final RateLimitingFilter rateLimitingFilter;
-
-  @Bean
-  public JwtAuthenticationFilter jwtAuthenticationFilter() {
-    return new JwtAuthenticationFilter(tokenProvider);
-  }
 
   @Bean
   public PasswordEncoder passwordEncoder() {
@@ -86,7 +80,7 @@ public class SecurityConfig {
     // Add filters in the correct order
     // RequestContextFilter is automatically added by Spring Boot because it's a @Component with
     // @Order
-    http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+    http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
     http.addFilterAfter(rateLimitingFilter, JwtAuthenticationFilter.class);
 
     return http.build();

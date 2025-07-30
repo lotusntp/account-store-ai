@@ -177,7 +177,7 @@
 
 - [ ] 6. Security Implementation
 
-  - [ ] 6.1 Implement JWT authentication filter
+  - [x] 6.1 Implement JWT authentication filter
 
     - Create JwtAuthenticationFilter
     - Implement token validation
