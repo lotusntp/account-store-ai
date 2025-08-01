@@ -49,10 +49,15 @@ public class TracingAwareFilterChain implements FilterChain {
   /**
    * Executes the original filter chain and captures tracing context at the optimal timing -
    * immediately after chain completion but before any OpenTelemetry cleanup operations.
+   *
+   * <p>Enhanced with thread-local context isolation to prevent context leakage.
    */
   @Override
   public void doFilter(ServletRequest request, ServletResponse response)
       throws IOException, ServletException {
+
+    // Store initial thread context state for restoration after chain completion
+    Map<String, String> initialThreadContext = captureInitialThreadContext();
 
     TracingContextCapture capturedContext = null;
     boolean chainExecutedSuccessfully = false;
@@ -126,9 +131,10 @@ public class TracingAwareFilterChain implements FilterChain {
       throw e;
 
     } finally {
-      // Always notify the captor about the captured context (even if null)
-      // This ensures graceful degradation and prevents request flow interruption
+      // CRITICAL: Thread context isolation and cleanup
       try {
+        // Always notify the captor about the captured context (even if null)
+        // This ensures graceful degradation and prevents request flow interruption
         if (capturedContext != null) {
           contextCaptor.accept(capturedContext);
           log.debug("Successfully provided captured context to captor");
@@ -167,6 +173,68 @@ public class TracingAwareFilterChain implements FilterChain {
           // Don't re-throw - we must ensure request flow continues
           // Application functionality is more important than perfect tracing
         }
+      } finally {
+        // CRITICAL: Restore initial thread context to prevent leakage
+        // This ensures thread isolation when threads are reused
+        restoreInitialThreadContext(initialThreadContext);
+      }
+    }
+  }
+
+  /**
+   * Captures the initial thread context state before processing begins. This is used for thread
+   * isolation to prevent context leakage when threads are reused.
+   *
+   * @return copy of initial MDC context or null if empty
+   */
+  private Map<String, String> captureInitialThreadContext() {
+    try {
+      Map<String, String> initialContext = org.slf4j.MDC.getCopyOfContextMap();
+
+      // Log if there's already context (potential thread reuse)
+      if (initialContext != null && !initialContext.isEmpty()) {
+        log.debug(
+            "Thread already has MDC context at filter chain start (thread reuse): {}",
+            initialContext.keySet());
+      }
+
+      return initialContext;
+    } catch (Exception e) {
+      log.warn("Failed to capture initial thread context: {}", e.getMessage());
+      return null;
+    }
+  }
+
+  /**
+   * Restores the initial thread context state after processing completes. This ensures thread
+   * isolation and prevents context leakage to subsequent requests.
+   *
+   * @param initialContext the initial context state to restore
+   */
+  private void restoreInitialThreadContext(Map<String, String> initialContext) {
+    try {
+      // Clear current MDC first
+      org.slf4j.MDC.clear();
+
+      // Restore initial context if it existed
+      if (initialContext != null && !initialContext.isEmpty()) {
+        initialContext.forEach(org.slf4j.MDC::put);
+        log.debug("Restored initial thread context for thread isolation");
+      } else {
+        log.debug("Thread context cleared for thread isolation (no initial context)");
+      }
+
+    } catch (Exception e) {
+      log.error(
+          "Critical: Failed to restore initial thread context - potential context leakage: {}",
+          e.getMessage());
+
+      // Emergency cleanup
+      try {
+        org.slf4j.MDC.clear();
+        log.warn("Performed emergency MDC clear after context restoration failure");
+      } catch (Exception clearException) {
+        log.error("Absolute failure: Cannot clear MDC context", clearException);
       }
     }
   }

@@ -437,6 +437,109 @@ public class LoggingService {
     }
   }
 
+  /**
+   * Log context leakage detection event with comprehensive monitoring data. This helps identify
+   * when threads are reused with leftover MDC context.
+   *
+   * @param phase the phase when leakage was detected ("pre-filter", "post-filter", etc.)
+   * @param leftoverKeys the MDC keys that were detected as leftover
+   * @param threadId the thread ID where leakage was detected
+   * @param additionalData additional context data for analysis
+   */
+  public void logContextLeakageDetection(
+      String phase,
+      java.util.Set<String> leftoverKeys,
+      long threadId,
+      Map<String, Object> additionalData) {
+    try {
+      var marker =
+          Markers.append("eventType", "context_leakage_detection")
+              .and(Markers.append("timestamp", Instant.now().toString()))
+              .and(Markers.append("category", "security"))
+              .and(Markers.append("severity", "warning"))
+              .and(Markers.append("phase", phase))
+              .and(Markers.append("threadId", threadId))
+              .and(Markers.append("leftoverKeyCount", leftoverKeys.size()))
+              .and(Markers.append("leftoverKeys", leftoverKeys));
+
+      // Add MDC context for correlation (if available)
+      var finalMarker = addMdcToMarker(marker);
+
+      // Add additional data if provided
+      if (additionalData != null && !additionalData.isEmpty()) {
+        for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
+          finalMarker = finalMarker.and(Markers.append(entry.getKey(), entry.getValue()));
+        }
+      }
+
+      log.warn(
+          finalMarker,
+          "Context leakage detected in phase '{}' on thread {} with {} leftover keys: {}",
+          phase,
+          threadId,
+          leftoverKeys.size(),
+          leftoverKeys);
+
+    } catch (Exception e) {
+      // Fallback logging if structured logging fails
+      log.error(
+          "Failed to log context leakage detection (phase: {}, thread: {}, keys: {}): {}",
+          phase,
+          threadId,
+          leftoverKeys,
+          e.getMessage());
+    }
+  }
+
+  /**
+   * Log thread context cleanup metrics for monitoring cleanup effectiveness.
+   *
+   * @param phase the cleanup phase ("pre-filter", "post-filter")
+   * @param hadPreviousContext whether there was context before cleanup
+   * @param cleanupSuccessful whether cleanup was successful
+   * @param threadId the thread ID being cleaned up
+   */
+  public void logThreadContextCleanupMetrics(
+      String phase, boolean hadPreviousContext, boolean cleanupSuccessful, long threadId) {
+    try {
+      var marker =
+          Markers.append("eventType", "thread_context_cleanup")
+              .and(Markers.append("timestamp", Instant.now().toString()))
+              .and(Markers.append("category", "metrics"))
+              .and(Markers.append("phase", phase))
+              .and(Markers.append("threadId", threadId))
+              .and(Markers.append("hadPreviousContext", hadPreviousContext))
+              .and(Markers.append("cleanupSuccessful", cleanupSuccessful));
+
+      // Add MDC context for correlation (if available)
+      var finalMarker = addMdcToMarker(marker);
+
+      if (cleanupSuccessful) {
+        log.debug(
+            finalMarker,
+            "Thread context cleanup successful (phase: {}, thread: {}, had previous: {})",
+            phase,
+            threadId,
+            hadPreviousContext);
+      } else {
+        log.warn(
+            finalMarker,
+            "Thread context cleanup failed (phase: {}, thread: {}, had previous: {})",
+            phase,
+            threadId,
+            hadPreviousContext);
+      }
+
+    } catch (Exception e) {
+      // Fallback logging if structured logging fails
+      log.error(
+          "Failed to log thread context cleanup metrics (phase: {}, thread: {}): {}",
+          phase,
+          threadId,
+          e.getMessage());
+    }
+  }
+
   /** Log with structured arguments for better Elasticsearch indexing */
   public void logWithStructuredArgs(String level, String message, Object... keyValuePairs) {
     // Convert key-value pairs to structured arguments

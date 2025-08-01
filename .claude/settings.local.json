@@ -13,7 +13,10 @@
       "Bash(rg:*)",
       "Bash(rm:*)",
       "Bash(mv:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(timeout 15 mvn spring-boot:run -Dspring-boot.run.profiles=dev)"
     ],
     "deny": []
   }

@@ -78,6 +78,13 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
               }
             });
 
+    // Pre-filter cleanup: Ensure thread starts with clean MDC state
+    // This prevents context leakage from previous requests on reused threads
+    cleanupThreadContext("pre-filter");
+
+    TracingContextCapture context = null;
+    boolean contextRestored = false;
+
     try {
       // Process request through the tracing-aware chain with response wrapper
       // ResponseTracingWrapper will capture context when response is committed
@@ -85,68 +92,95 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
       tracingChain.doFilter(wrappedRequest, tracingResponseWrapper);
 
     } finally {
-      // Calculate request duration
-      long duration = System.currentTimeMillis() - startTime;
+      // CRITICAL: Ensure cleanup happens no matter what
+      try {
+        // Calculate request duration
+        long duration = System.currentTimeMillis() - startTime;
 
-      // Get the captured tracing context
-      TracingContextCapture context = capturedContext.get();
+        // Get the captured tracing context
+        context = capturedContext.get();
 
-      if (context != null) {
-        // Restore the captured tracing context to MDC
-        context.restore();
-
-        // Log metrics about successful context preservation
-        String captureMethod =
-            tracingResponseWrapper.isContextCaptured()
-                ? "ResponseTracingWrapper"
-                : "TracingAwareFilterChain";
-        loggingService.logContextPreservationMetrics(
-            context.hasValidContext(), captureMethod, httpRequest.getRequestURI());
-      } else {
-        // Enhanced fallback logging with graceful degradation
-        try {
-          loggingService.logFallbackCorrelation(
-              correlationId, "No tracing context captured by either mechanism");
-        } catch (Exception fallbackLogException) {
-          log.warn(
-              "Failed to log fallback correlation, using basic logging: {}",
-              fallbackLogException.getMessage());
-        }
-
-        // Enhanced fallback: Use LoggingService's emergency correlation method
-        try {
-          String emergencyCorrelationId =
-              loggingService.createEmergencyCorrelationId("filter-no-context");
-          log.info(
-              "Created emergency correlation ID for request without tracing context: {}",
-              emergencyCorrelationId);
-        } catch (Exception emergencyException) {
-          // Final fallback: at least set the correlation ID manually
+        if (context != null) {
           try {
-            org.slf4j.MDC.put("requestId", correlationId);
-            org.slf4j.MDC.put("request.id", correlationId);
-            org.slf4j.MDC.put("tracingDegraded", "true");
-            org.slf4j.MDC.put("degradationReason", "manual_correlation_fallback");
-            log.warn("Manually set correlation ID as final fallback: {}", correlationId);
-          } catch (Exception manualException) {
-            log.error("Critical: Cannot set any correlation context", manualException);
+            // Restore the captured tracing context to MDC
+            context.restore();
+            contextRestored = true;
+
+            // Log metrics about successful context preservation
+            String captureMethod =
+                tracingResponseWrapper.isContextCaptured()
+                    ? "ResponseTracingWrapper"
+                    : "TracingAwareFilterChain";
+            loggingService.logContextPreservationMetrics(
+                context.hasValidContext(), captureMethod, httpRequest.getRequestURI());
+          } catch (Exception contextRestoreException) {
+            log.warn(
+                "Context restoration failed, using emergency fallback: {}",
+                contextRestoreException.getMessage());
+            // Continue to fallback handling below
+            context = null;
           }
         }
-      }
 
-      try {
-        // Log response with restored tracing context
-        logResponse(wrappedRequest, wrappedResponse, duration, correlationId);
+        if (context == null) {
+          // Enhanced fallback logging with graceful degradation
+          try {
+            loggingService.logFallbackCorrelation(
+                correlationId, "No tracing context captured by either mechanism");
+          } catch (Exception fallbackLogException) {
+            log.warn(
+                "Failed to log fallback correlation, using basic logging: {}",
+                fallbackLogException.getMessage());
+          }
 
+          // Enhanced fallback: Use LoggingService's emergency correlation method
+          try {
+            String emergencyCorrelationId =
+                loggingService.createEmergencyCorrelationId("filter-no-context");
+            log.info(
+                "Created emergency correlation ID for request without tracing context: {}",
+                emergencyCorrelationId);
+          } catch (Exception emergencyException) {
+            // Final fallback: at least set the correlation ID manually
+            try {
+              org.slf4j.MDC.put("requestId", correlationId);
+              org.slf4j.MDC.put("request.id", correlationId);
+              org.slf4j.MDC.put("tracingDegraded", "true");
+              org.slf4j.MDC.put("degradationReason", "manual_correlation_fallback");
+              log.warn("Manually set correlation ID as final fallback: {}", correlationId);
+            } catch (Exception manualException) {
+              log.error("Critical: Cannot set any correlation context", manualException);
+            }
+          }
+        }
+
+        try {
+          // Log response with restored tracing context
+          logResponse(wrappedRequest, wrappedResponse, duration, correlationId);
+
+        } finally {
+          try {
+            // Write cached response body to actual response
+            writeResponseBody(wrappedResponse, httpResponse);
+          } catch (Exception responseWriteException) {
+            log.error("Failed to write response body", responseWriteException);
+            // Don't re-throw - cleanup must continue
+          }
+        }
       } finally {
-        // Write cached response body to actual response
-        writeResponseBody(wrappedResponse, httpResponse);
-
-        // Clean up MDC context to prevent leakage
-        if (context != null) {
-          context.cleanup();
-        } else {
-          org.slf4j.MDC.clear();
+        // CRITICAL: Context cleanup must ALWAYS happen to prevent leakage
+        // This is the most important part for preventing context leakage
+        try {
+          if (context != null && contextRestored) {
+            context.cleanup();
+          }
+        } catch (Exception contextCleanupException) {
+          log.warn(
+              "Context cleanup failed, performing emergency cleanup: {}",
+              contextCleanupException.getMessage());
+        } finally {
+          // Emergency thread context cleanup - always performed
+          cleanupThreadContext("post-filter");
         }
       }
     }
@@ -372,6 +406,93 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
       return objectMapper.writeValueAsString(jsonMap);
     } catch (Exception e) {
       return responseBody; // Return original if not JSON or parsing fails
+    }
+  }
+
+  /**
+   * Performs comprehensive thread context cleanup to prevent context leakage. This method ensures
+   * that no MDC context from previous requests remains when threads are reused from the thread
+   * pool.
+   *
+   * @param phase the phase of cleanup ("pre-filter" or "post-filter")
+   */
+  private void cleanupThreadContext(String phase) {
+    try {
+      // Get current MDC state for monitoring
+      Map<String, String> beforeCleanup = org.slf4j.MDC.getCopyOfContextMap();
+      boolean hadContext = beforeCleanup != null && !beforeCleanup.isEmpty();
+
+      if (hadContext && "pre-filter".equals(phase)) {
+        // Log potential context leakage from previous request
+        log.warn(
+            "Detected leftover MDC context at start of request (potential thread reuse leakage):"
+                + " {}",
+            beforeCleanup.keySet());
+
+        // Add leakage detection markers
+        loggingService.logSystemEvent(
+            "potential_context_leakage",
+            "Thread context cleanup detected leftover MDC state",
+            Map.of(
+                "phase", phase,
+                "leftoverKeys", beforeCleanup.keySet(),
+                "threadId", Thread.currentThread().getId()));
+      }
+
+      // Perform comprehensive MDC cleanup
+      org.slf4j.MDC.clear();
+
+      // Verify cleanup was successful
+      Map<String, String> afterCleanup = org.slf4j.MDC.getCopyOfContextMap();
+      boolean cleanupSuccessful = afterCleanup == null || afterCleanup.isEmpty();
+
+      if (!cleanupSuccessful) {
+        log.error(
+            "Critical: MDC cleanup failed, context may leak to next request: {}",
+            afterCleanup.keySet());
+
+        // Force cleanup individual keys as fallback
+        String[] commonKeys = {
+          "traceId",
+          "spanId",
+          "requestId",
+          "request.id",
+          "tracingDegraded",
+          "degradationReason",
+          "emergencyMode",
+          "userId",
+          "sessionId",
+          "correlationIdGenerated"
+        };
+
+        for (String key : commonKeys) {
+          try {
+            org.slf4j.MDC.remove(key);
+          } catch (Exception keyRemovalException) {
+            log.error("Cannot remove MDC key: " + key, keyRemovalException);
+          }
+        }
+      }
+
+      if ("post-filter".equals(phase)) {
+        log.debug("Thread context cleanup completed successfully for phase: {}", phase);
+      }
+
+    } catch (Exception cleanupException) {
+      log.error(
+          "Critical failure during thread context cleanup (phase: {}): context leakage risk high",
+          phase,
+          cleanupException);
+
+      // Last resort: try to clear at least basic tracing fields
+      try {
+        org.slf4j.MDC.remove("traceId");
+        org.slf4j.MDC.remove("spanId");
+        org.slf4j.MDC.remove("requestId");
+        org.slf4j.MDC.remove("request.id");
+      } catch (Exception lastResortException) {
+        log.error("Absolute failure: Cannot perform any context cleanup", lastResortException);
+      }
     }
   }
 

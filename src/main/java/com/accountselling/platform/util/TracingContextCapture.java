@@ -255,12 +255,50 @@ public class TracingContextCapture {
   }
 
   /**
-   * Cleans up the current MDC context. This method should be called after response logging is
-   * complete to prevent context leakage between requests.
+   * Cleans up the current MDC context with enhanced leakage prevention. This method should be
+   * called after response logging is complete to prevent context leakage between requests when
+   * threads are reused.
+   *
+   * <p>Enhanced with comprehensive cleanup verification and fallback mechanisms.
    */
   public void cleanup() {
     try {
+      // Capture current state for verification
+      Map<String, String> beforeCleanup = MDC.getCopyOfContextMap();
+      boolean hadContext = beforeCleanup != null && !beforeCleanup.isEmpty();
+
+      // Primary cleanup method
       MDC.clear();
+
+      // Verify cleanup was successful
+      Map<String, String> afterCleanup = MDC.getCopyOfContextMap();
+      boolean cleanupSuccessful = afterCleanup == null || afterCleanup.isEmpty();
+
+      if (!cleanupSuccessful) {
+        log.warn(
+            "Primary MDC cleanup failed, {} keys remain: {}",
+            afterCleanup.size(),
+            afterCleanup.keySet());
+
+        // Fallback: Remove keys individually
+        performIndividualKeyCleanup(afterCleanup.keySet());
+
+        // Re-verify after fallback cleanup
+        Map<String, String> afterFallback = MDC.getCopyOfContextMap();
+        boolean fallbackSuccessful = afterFallback == null || afterFallback.isEmpty();
+
+        if (!fallbackSuccessful) {
+          log.error(
+              "Critical: Both primary and fallback MDC cleanup failed, {} keys still remain: {}",
+              afterFallback.size(),
+              afterFallback.keySet());
+        } else {
+          log.info("Fallback MDC cleanup successful after primary cleanup failure");
+        }
+      } else if (hadContext) {
+        log.debug("MDC context cleanup completed successfully");
+      }
+
     } catch (Exception e) {
       log.warn(
           "Failed to cleanup MDC context, continuing with graceful degradation: {}",
@@ -270,20 +308,58 @@ public class TracingContextCapture {
       // Graceful degradation: Try alternative cleanup methods
       try {
         // Try to remove individual keys if full clear fails
-        MDC.remove("traceId");
-        MDC.remove("spanId");
-        MDC.remove("requestId");
-        MDC.remove("request.id");
-        MDC.remove("tracingDegraded");
-        MDC.remove("degradationReason");
-        MDC.remove("emergencyMode");
+        String[] criticalKeys = {
+          "traceId",
+          "spanId",
+          "requestId",
+          "request.id",
+          "tracingDegraded",
+          "degradationReason",
+          "emergencyMode",
+          "userId",
+          "sessionId",
+          "correlationIdGenerated"
+        };
+
+        performIndividualKeyCleanup(java.util.Set.of(criticalKeys));
         log.debug("Successfully performed partial MDC cleanup");
+
       } catch (Exception partialCleanupError) {
         log.error(
             "Critical: Cannot perform any MDC cleanup, potential context leakage risk",
             partialCleanupError);
         // Continue execution - context leakage is less critical than application failure
       }
+    }
+  }
+
+  /**
+   * Performs individual key cleanup as fallback mechanism. This method attempts to remove specific
+   * MDC keys when bulk cleanup fails.
+   *
+   * @param keysToRemove set of MDC keys to remove
+   */
+  private void performIndividualKeyCleanup(java.util.Set<String> keysToRemove) {
+    int successCount = 0;
+    int failCount = 0;
+
+    for (String key : keysToRemove) {
+      try {
+        MDC.remove(key);
+        successCount++;
+      } catch (Exception keyRemovalException) {
+        failCount++;
+        log.debug("Failed to remove MDC key '{}': {}", key, keyRemovalException.getMessage());
+      }
+    }
+
+    if (failCount > 0) {
+      log.warn(
+          "Individual key cleanup completed with {} successes and {} failures",
+          successCount,
+          failCount);
+    } else {
+      log.debug("Individual key cleanup completed successfully for {} keys", successCount);
     }
   }
 
