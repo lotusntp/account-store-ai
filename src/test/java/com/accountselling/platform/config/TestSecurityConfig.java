@@ -1,5 +1,8 @@
 package com.accountselling.platform.config;
 
+import static org.mockito.Mockito.mock;
+
+import com.accountselling.platform.security.JwtTokenProvider;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -37,5 +40,11 @@ public class TestSecurityConfig {
                     .authenticated());
 
     return http.build();
+  }
+
+  @Bean
+  @Primary
+  public JwtTokenProvider testJwtTokenProvider() {
+    return mock(JwtTokenProvider.class);
   }
 }

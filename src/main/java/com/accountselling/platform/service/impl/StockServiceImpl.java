@@ -45,7 +45,7 @@ public class StockServiceImpl implements StockService {
 
   @Override
   @Transactional
-  public Stock createStock(UUID productId, String credentials, String additionalInfo) {
+  public Stock createStock(UUID productId, String accountData, String additionalInfo) {
     log.info("Creating new stock for product ID: {}", productId);
 
     // Check if product exists
@@ -58,14 +58,14 @@ public class StockServiceImpl implements StockService {
                   return new ResourceNotFoundException("Product not found with ID: " + productId);
                 });
 
-    // Check if credentials already exist
-    if (stockRepository.existsByProductIdAndCredentials(productId, credentials)) {
-      log.error("Duplicate credentials for product ID: {}", productId);
-      throw new StockException("Stock with identical credentials already exists for this product");
+    // Check if accountData already exist
+    if (stockRepository.existsByProductIdAndAccountData(productId, accountData)) {
+      log.error("Duplicate accountData for product ID: {}", productId);
+      throw new StockException("Stock with identical accountData already exists for this product");
     }
 
     // Create new stock
-    Stock stock = new Stock(product, credentials, additionalInfo);
+    Stock stock = new Stock(product, accountData, additionalInfo);
     Stock savedStock = stockRepository.save(stock);
 
     log.info(
@@ -76,8 +76,8 @@ public class StockServiceImpl implements StockService {
 
   @Override
   @Transactional
-  public List<Stock> createBulkStock(UUID productId, List<String> credentialsList) {
-    log.info("Creating {} stock items for product ID: {}", credentialsList.size(), productId);
+  public List<Stock> createBulkStock(UUID productId, List<String> accountDataList) {
+    log.info("Creating {} stock items for product ID: {}", accountDataList.size(), productId);
 
     // Check if product exists
     Product product =
@@ -91,12 +91,12 @@ public class StockServiceImpl implements StockService {
 
     List<Stock> stockItems = new ArrayList<>();
 
-    for (String credentials : credentialsList) {
-      // Skip duplicate credentials
-      if (!stockRepository.existsByProductIdAndCredentials(productId, credentials)) {
-        stockItems.add(new Stock(product, credentials));
+    for (String accountData : accountDataList) {
+      // Skip duplicate accountData
+      if (!stockRepository.existsByProductIdAndAccountData(productId, accountData)) {
+        stockItems.add(new Stock(product, accountData));
       } else {
-        log.warn("Skipping duplicate credentials for product ID: {}", productId);
+        log.warn("Skipping duplicate accountData for product ID: {}", productId);
       }
     }
 
@@ -551,21 +551,21 @@ public class StockServiceImpl implements StockService {
 
   @Override
   public List<String> findDuplicateCredentials(UUID productId) {
-    log.debug("Finding duplicate credentials for product ID: {}", productId);
+    log.debug("Finding duplicate accountData for product ID: {}", productId);
 
-    List<String> duplicates = stockRepository.findDuplicateCredentialsByProductId(productId);
+    List<String> duplicates = stockRepository.findDuplicateAccountDataByProductId(productId);
 
     if (!duplicates.isEmpty()) {
-      log.warn("Found {} duplicate credentials for product ID: {}", duplicates.size(), productId);
+      log.warn("Found {} duplicate accountData for product ID: {}", duplicates.size(), productId);
     }
 
     return duplicates;
   }
 
   @Override
-  public boolean credentialsExist(UUID productId, String credentials) {
-    log.debug("Checking credentials existence for product ID: {}", productId);
-    return stockRepository.existsByProductIdAndCredentials(productId, credentials);
+  public boolean accountDataExists(UUID productId, String accountData) {
+    log.debug("Checking accountData existence for product ID: {}", productId);
+    return stockRepository.existsByProductIdAndAccountData(productId, accountData);
   }
 
   @Override

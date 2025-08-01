@@ -10,7 +10,9 @@
       "Bash(mvn:*)",
       "Bash(grep:*)",
       "Bash(mvn*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

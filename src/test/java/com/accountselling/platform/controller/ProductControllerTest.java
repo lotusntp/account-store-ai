@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.accountselling.platform.dto.product.ProductSearchRequestDto;
 import com.accountselling.platform.model.Category;
 import com.accountselling.platform.model.Product;
+import com.accountselling.platform.security.JwtTokenProvider;
 import com.accountselling.platform.service.ProductService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -27,20 +28,20 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Unit tests for ProductController. Tests controller logic with mocked service dependencies.
- * Security is disabled for unit tests to focus on controller logic.
+ * Uses @WithMockUser to simulate authenticated user for security context.
  *
  * <p>Unit tests สำหรับ ProductController ทดสอบ logic ของ controller ด้วย service dependencies
- * ที่ถูก mock ปิด security สำหรับ unit tests เพื่อให้เน้นที่ logic ของ controller
+ * ที่ถูก mock ใช้ @WithMockUser เพื่อจำลอง authenticated user สำหรับ security context
  */
-@WebMvcTest(
-    controllers = ProductController.class,
-    excludeAutoConfiguration = {
-      org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class
-    })
+@WebMvcTest(controllers = ProductController.class)
+@WithMockUser(
+    username = "testuser",
+    roles = {"USER"})
 class ProductControllerTest {
 
   @Autowired private MockMvc mockMvc;
@@ -48,6 +49,8 @@ class ProductControllerTest {
   @Autowired private ObjectMapper objectMapper;
 
   @MockBean private ProductService productService;
+
+  @MockBean private JwtTokenProvider jwtTokenProvider;
 
   private Product testProduct;
   private Category testCategory;

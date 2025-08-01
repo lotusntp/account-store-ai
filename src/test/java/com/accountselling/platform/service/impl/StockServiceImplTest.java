@@ -75,15 +75,15 @@ class StockServiceImplTest {
   @DisplayName("Should create new stock successfully")
   void shouldCreateStockSuccessfully() {
     // Given - Prepare data
-    String credentials = "test_credentials";
+    String accountData = "test_credentials";
     String additionalInfo = "test_additional_info";
 
     when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
-    when(stockRepository.existsByProductIdAndCredentials(productId, credentials)).thenReturn(false);
+    when(stockRepository.existsByProductIdAndAccountData(productId, accountData)).thenReturn(false);
     when(stockRepository.save(any(Stock.class))).thenReturn(testStock);
 
     // When - Execute method
-    Stock result = stockService.createStock(productId, credentials, additionalInfo);
+    Stock result = stockService.createStock(productId, accountData, additionalInfo);
 
     // Then - Verify results
     assertThat(result).isNotNull();
@@ -91,7 +91,7 @@ class StockServiceImplTest {
     assertThat(result.getAccountData()).isEqualTo("encrypted_credentials_123");
 
     verify(productRepository).findById(productId);
-    verify(stockRepository).existsByProductIdAndCredentials(productId, credentials);
+    verify(stockRepository).existsByProductIdAndAccountData(productId, accountData);
     verify(stockRepository).save(any(Stock.class));
   }
 
@@ -99,12 +99,12 @@ class StockServiceImplTest {
   @DisplayName("Should throw ResourceNotFoundException when product not found")
   void shouldThrowExceptionWhenProductNotFound() {
     // Given - Prepare data
-    String credentials = "test_credentials";
+    String accountData = "test_credentials";
 
     when(productRepository.findById(productId)).thenReturn(Optional.empty());
 
     // When & Then - Execute and verify exception
-    assertThatThrownBy(() -> stockService.createStock(productId, credentials, null))
+    assertThatThrownBy(() -> stockService.createStock(productId, accountData, null))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Product not found with ID: " + productId);
 
@@ -113,21 +113,21 @@ class StockServiceImplTest {
   }
 
   @Test
-  @DisplayName("Should throw ResourceAlreadyExistsException when credentials duplicate")
+  @DisplayName("Should throw StockException when credentials duplicate")
   void shouldThrowExceptionWhenCredentialsDuplicate() {
     // Given - Prepare data
-    String credentials = "duplicate_credentials";
+    String accountData = "duplicate_credentials";
 
     when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
-    when(stockRepository.existsByProductIdAndCredentials(productId, credentials)).thenReturn(true);
+    when(stockRepository.existsByProductIdAndAccountData(productId, accountData)).thenReturn(true);
 
     // When & Then - Execute and verify exception
-    assertThatThrownBy(() -> stockService.createStock(productId, credentials, null))
+    assertThatThrownBy(() -> stockService.createStock(productId, accountData, null))
         .isInstanceOf(StockException.class)
-        .hasMessageContaining("Stock with identical credentials already exists for this product");
+        .hasMessageContaining("Stock with identical accountData already exists for this product");
 
     verify(productRepository).findById(productId);
-    verify(stockRepository).existsByProductIdAndCredentials(productId, credentials);
+    verify(stockRepository).existsByProductIdAndAccountData(productId, accountData);
     verify(stockRepository, never()).save(any());
   }
 
@@ -135,7 +135,7 @@ class StockServiceImplTest {
   @DisplayName("Should create bulk stock successfully")
   void shouldCreateBulkStockSuccessfully() {
     // Given - Prepare data
-    List<String> credentialsList = Arrays.asList("cred1", "cred2", "cred3");
+    List<String> accountDataList = Arrays.asList("cred1", "cred2", "cred3");
     List<Stock> expectedStocks =
         Arrays.asList(
             new Stock(testProduct, "cred1"),
@@ -143,19 +143,19 @@ class StockServiceImplTest {
             new Stock(testProduct, "cred3"));
 
     when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
-    when(stockRepository.existsByProductIdAndCredentials(eq(productId), anyString()))
+    when(stockRepository.existsByProductIdAndAccountData(eq(productId), anyString()))
         .thenReturn(false);
     when(stockRepository.saveAll(anyList())).thenReturn(expectedStocks);
 
     // When - Execute method
-    List<Stock> result = stockService.createBulkStock(productId, credentialsList);
+    List<Stock> result = stockService.createBulkStock(productId, accountDataList);
 
     // Then - Verify results
     assertThat(result).hasSize(3);
     assertThat(result).extracting(Stock::getAccountData).containsExactly("cred1", "cred2", "cred3");
 
     verify(productRepository).findById(productId);
-    verify(stockRepository, times(3)).existsByProductIdAndCredentials(eq(productId), anyString());
+    verify(stockRepository, times(3)).existsByProductIdAndAccountData(eq(productId), anyString());
     verify(stockRepository).saveAll(anyList());
   }
 
@@ -446,7 +446,7 @@ class StockServiceImplTest {
     // Given - Prepare data
     List<String> duplicates = Arrays.asList("duplicate_cred1", "duplicate_cred2");
 
-    when(stockRepository.findDuplicateCredentialsByProductId(productId)).thenReturn(duplicates);
+    when(stockRepository.findDuplicateAccountDataByProductId(productId)).thenReturn(duplicates);
 
     // When - Execute method
     List<String> result = stockService.findDuplicateCredentials(productId);
@@ -455,24 +455,24 @@ class StockServiceImplTest {
     assertThat(result).hasSize(2);
     assertThat(result).containsExactly("duplicate_cred1", "duplicate_cred2");
 
-    verify(stockRepository).findDuplicateCredentialsByProductId(productId);
+    verify(stockRepository).findDuplicateAccountDataByProductId(productId);
   }
 
   @Test
-  @DisplayName("Should check credentials existence")
+  @DisplayName("Should check accountData existence")
   void shouldCheckCredentialsExistence() {
     // Given - Prepare data
-    String credentials = "test_credentials";
+    String accountData = "test_credentials";
 
-    when(stockRepository.existsByProductIdAndCredentials(productId, credentials)).thenReturn(true);
+    when(stockRepository.existsByProductIdAndAccountData(productId, accountData)).thenReturn(true);
 
     // When - Execute method
-    boolean result = stockService.credentialsExist(productId, credentials);
+    boolean result = stockService.accountDataExists(productId, accountData);
 
     // Then - Verify results
     assertThat(result).isTrue();
 
-    verify(stockRepository).existsByProductIdAndCredentials(productId, credentials);
+    verify(stockRepository).existsByProductIdAndAccountData(productId, accountData);
   }
 
   @Test

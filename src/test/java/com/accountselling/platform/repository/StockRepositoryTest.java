@@ -476,15 +476,15 @@ class StockRepositoryTest {
   void shouldCheckIfStockExistsWithSpecificCredentials() {
     // When & Then
     assertThat(
-            stockRepository.existsByProductIdAndCredentials(
+            stockRepository.existsByProductIdAndAccountData(
                 testProduct1.getId(), "username1:password1"))
         .isTrue();
     assertThat(
-            stockRepository.existsByProductIdAndCredentials(
+            stockRepository.existsByProductIdAndAccountData(
                 testProduct1.getId(), "nonexistent:credentials"))
         .isFalse();
     assertThat(
-            stockRepository.existsByProductIdAndCredentials(
+            stockRepository.existsByProductIdAndAccountData(
                 testProduct2.getId(), "username1:password1"))
         .isFalse();
   }
@@ -541,7 +541,7 @@ class StockRepositoryTest {
     entityManager.persistAndFlush(duplicateStock);
 
     // When
-    List<String> result = stockRepository.findDuplicateCredentialsByProductId(testProduct1.getId());
+    List<String> result = stockRepository.findDuplicateAccountDataByProductId(testProduct1.getId());
 
     // Then
     assertThat(result).hasSize(1);

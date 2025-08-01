@@ -25,23 +25,23 @@ public interface StockService {
    * Create new stock item for a product
    *
    * @param productId ID of the product
-   * @param credentials encrypted account credentials
+   * @param accountData encrypted account data
    * @param additionalInfo additional information (if any)
    * @return Stock the created stock item
    * @throws ResourceNotFoundException if product is not found
-   * @throws ResourceAlreadyExistsException if credentials already exist
+   * @throws ResourceAlreadyExistsException if accountData already exist
    */
-  Stock createStock(UUID productId, String credentials, String additionalInfo);
+  Stock createStock(UUID productId, String accountData, String additionalInfo);
 
   /**
    * Create multiple stock items for a product in bulk
    *
    * @param productId ID of the product
-   * @param credentialsList list of encrypted account credentials
+   * @param accountDataList list of encrypted account data
    * @return List<Stock> list of created stock items
    * @throws ResourceNotFoundException if product is not found
    */
-  List<Stock> createBulkStock(UUID productId, List<String> credentialsList);
+  List<Stock> createBulkStock(UUID productId, List<String> accountDataList);
 
   /**
    * Get all stock items for a product
@@ -277,21 +277,21 @@ public interface StockService {
   // ==================== UTILITY OPERATIONS ====================
 
   /**
-   * Check for duplicate credentials in product stock
+   * Check for duplicate account data in product stock
    *
    * @param productId ID of the product
-   * @return List<String> list of duplicate credentials
+   * @return List<String> list of duplicate account data
    */
   List<String> findDuplicateCredentials(UUID productId);
 
   /**
-   * Check if credentials already exist for a product
+   * Check if account data already exists for a product
    *
    * @param productId ID of the product
-   * @param credentials credentials to check
+   * @param accountData account data to check
    * @return boolean true if already exists, false if not
    */
-  boolean credentialsExist(UUID productId, String credentials);
+  boolean accountDataExists(UUID productId, String accountData);
 
   /**
    * Update low stock threshold for a product

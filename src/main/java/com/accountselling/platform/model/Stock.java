@@ -41,7 +41,7 @@ public class Stock extends BaseEntity {
   @Size(max = 2000, message = "Account data cannot exceed 2000 characters")
   @Column(name = "account_data", nullable = false, length = 2000)
   @EqualsAndHashCode.Include
-  private String accountData;
+  private String accountData; // This field should contain encrypted account credentials
 
   @Size(max = 100, message = "Account type cannot exceed 100 characters")
   @Column(name = "account_type", length = 100)

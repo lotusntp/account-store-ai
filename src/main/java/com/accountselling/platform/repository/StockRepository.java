@@ -340,14 +340,14 @@ public interface StockRepository extends JpaRepository<Stock, UUID> {
   List<Product> findProductsWithLowStock(@Param("threshold") long threshold);
 
   /**
-   * Find stock items by credentials pattern. Used for debugging and administrative searches.
+   * Find stock items by account data pattern. Used for debugging and administrative searches.
    * WARNING: This should be used carefully due to sensitive data.
    *
-   * @param credentialsPattern pattern to search in credentials
-   * @return list of stock items matching the credentials pattern
+   * @param accountDataPattern pattern to search in account data
+   * @return list of stock items matching the account data pattern
    */
-  @Query("SELECT s FROM Stock s WHERE s.credentials LIKE %:credentialsPattern%")
-  List<Stock> findByCredentialsContaining(@Param("credentialsPattern") String credentialsPattern);
+  @Query("SELECT s FROM Stock s WHERE s.accountData LIKE %:accountDataPattern%")
+  List<Stock> findByAccountDataContaining(@Param("accountDataPattern") String accountDataPattern);
 
   /**
    * Find stock statistics grouped by product. Used for comprehensive inventory reporting.
@@ -380,29 +380,29 @@ public interface StockRepository extends JpaRepository<Stock, UUID> {
   int deleteSoldStockOlderThan(@Param("cutoffDate") LocalDateTime cutoffDate);
 
   /**
-   * Find duplicate credentials within the same product. Used for data integrity checks.
+   * Find duplicate account data within the same product. Used for data integrity checks.
    *
    * @param productId the product ID to check for duplicates
-   * @return list of duplicate credentials
+   * @return list of duplicate account data
    */
   @Query(
       """
-      SELECT s.credentials FROM Stock s
+      SELECT s.accountData FROM Stock s
       WHERE s.product.id = :productId
-      GROUP BY s.credentials
-      HAVING COUNT(s.credentials) > 1
+      GROUP BY s.accountData
+      HAVING COUNT(s.accountData) > 1
       """)
-  List<String> findDuplicateCredentialsByProductId(@Param("productId") UUID productId);
+  List<String> findDuplicateAccountDataByProductId(@Param("productId") UUID productId);
 
   /**
-   * Check if stock item exists with specific credentials for a product. Used for preventing
+   * Check if stock item exists with specific account data for a product. Used for preventing
    * duplicate stock entries.
    *
    * @param productId the product ID to check
-   * @param credentials the credentials to check for existence
-   * @return true if stock exists with these credentials for the product
+   * @param accountData the account data to check for existence
+   * @return true if stock exists with this account data for the product
    */
-  boolean existsByProductIdAndCredentials(UUID productId, String credentials);
+  boolean existsByProductIdAndAccountData(UUID productId, String accountData);
 
   /**
    * Find the oldest unsold stock item by product. Used for FIFO (First In, First Out) stock
