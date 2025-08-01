@@ -213,7 +213,7 @@
     - Write tests for tracing
     - _Requirements: 7.1, 7.5_
 
-  - [ ] 7.2 Implement logging
+  - [x] 7.2 Implement logging
 
     - Configure structured logging
     - Set up log shipping to Elasticsearch

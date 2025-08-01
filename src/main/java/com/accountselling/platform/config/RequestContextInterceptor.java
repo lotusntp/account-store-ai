@@ -77,11 +77,13 @@ public class RequestContextInterceptor implements HandlerInterceptor {
   public void afterCompletion(
       HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
     // Clean up MDC to prevent memory leaks
+    // NOTE: Don't remove request.id, traceId, requestId here because Filter needs them for response
+    // logging
     MDC.remove("http.request.method");
     MDC.remove("http.request.path");
     MDC.remove("http.request.remote_ip");
     MDC.remove("http.response.status_code");
-    MDC.remove("request.id");
+    // MDC.remove("request.id"); // Keep for Filter response logging
     MDC.remove("session.id");
     MDC.remove("user.id");
     MDC.remove("user.name");

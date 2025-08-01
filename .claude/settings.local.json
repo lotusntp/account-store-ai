@@ -12,7 +12,8 @@
       "Bash(mvn*)",
       "Bash(rg:*)",
       "Bash(rm:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": []
   }
