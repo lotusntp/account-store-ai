@@ -27,19 +27,37 @@ public class LoggingService {
   /** Add MDC context to marker for consistent tracing */
   private net.logstash.logback.marker.LogstashMarker addMdcToMarker(
       net.logstash.logback.marker.LogstashMarker marker) {
-    String traceId = MDC.get("traceId");
+    // Add tracing context from preserved MDC
+    String traceId = MDC.get(TRACE_ID_KEY);
     if (traceId != null) {
-      marker = marker.and(Markers.append("traceId", traceId));
+      marker = marker.and(Markers.append(TRACE_ID_KEY, traceId));
     }
 
-    String requestId = MDC.get("requestId");
+    String spanId = MDC.get(SPAN_ID_KEY);
+    if (spanId != null) {
+      marker = marker.and(Markers.append(SPAN_ID_KEY, spanId));
+    }
+
+    // Add request correlation IDs
+    String requestId = MDC.get(REQUEST_ID_KEY);
     if (requestId != null) {
-      marker = marker.and(Markers.append("requestId", requestId));
+      marker = marker.and(Markers.append(REQUEST_ID_KEY, requestId));
     }
 
     String mdcRequestId = MDC.get("request.id");
     if (mdcRequestId != null) {
       marker = marker.and(Markers.append("request.id", mdcRequestId));
+    }
+
+    // Add user context if available
+    String userId = MDC.get(USER_ID_KEY);
+    if (userId != null) {
+      marker = marker.and(Markers.append(USER_ID_KEY, userId));
+    }
+
+    String sessionId = MDC.get(SESSION_ID_KEY);
+    if (sessionId != null) {
+      marker = marker.and(Markers.append(SESSION_ID_KEY, sessionId));
     }
 
     return marker;
@@ -93,6 +111,13 @@ public class LoggingService {
         Markers.append("eventType", eventType)
             .and(Markers.append("timestamp", Instant.now().toString()))
             .and(Markers.append("category", "system"));
+
+    // Check if tracing context is available
+    boolean hasTracing = hasTracingContext();
+    if (!hasTracing) {
+      // Add warning marker when tracing context is missing
+      baseMarker = baseMarker.and(Markers.append("tracingContextMissing", true));
+    }
 
     // Add MDC context (traceId, requestId, etc.)
     var markerWithMdc = addMdcToMarker(baseMarker);
@@ -207,6 +232,96 @@ public class LoggingService {
   /** Generate a new correlation ID */
   public String generateCorrelationId() {
     return UUID.randomUUID().toString();
+  }
+
+  /**
+   * Validates that tracing context is present in MDC
+   *
+   * @return true if tracing context (traceId) is available
+   */
+  public boolean hasTracingContext() {
+    return MDC.get(TRACE_ID_KEY) != null;
+  }
+
+  /**
+   * Gets current tracing context information for debugging
+   *
+   * @return Map containing current MDC tracing fields
+   */
+  public Map<String, String> getTracingContext() {
+    Map<String, String> context = new java.util.HashMap<>();
+
+    String traceId = MDC.get(TRACE_ID_KEY);
+    if (traceId != null) {
+      context.put(TRACE_ID_KEY, traceId);
+    }
+
+    String spanId = MDC.get(SPAN_ID_KEY);
+    if (spanId != null) {
+      context.put(SPAN_ID_KEY, spanId);
+    }
+
+    String requestId = MDC.get(REQUEST_ID_KEY);
+    if (requestId != null) {
+      context.put(REQUEST_ID_KEY, requestId);
+    }
+
+    String mdcRequestId = MDC.get("request.id");
+    if (mdcRequestId != null) {
+      context.put("request.id", mdcRequestId);
+    }
+
+    return context;
+  }
+
+  /**
+   * Log metrics about tracing context preservation
+   *
+   * @param contextPreserved whether context was successfully preserved
+   * @param captureMethod the method used to capture context (e.g., "ResponseTracingWrapper",
+   *     "TracingAwareFilterChain")
+   * @param requestUri the request URI for context
+   */
+  public void logContextPreservationMetrics(
+      boolean contextPreserved, String captureMethod, String requestUri) {
+    var marker =
+        Markers.append("eventType", "context_preservation_metrics")
+            .and(Markers.append("timestamp", Instant.now().toString()))
+            .and(Markers.append("category", "metrics"))
+            .and(Markers.append("contextPreserved", contextPreserved))
+            .and(Markers.append("captureMethod", captureMethod))
+            .and(Markers.append("requestUri", requestUri));
+
+    // Add current MDC context
+    var finalMarker = addMdcToMarker(marker);
+
+    if (contextPreserved) {
+      log.info(finalMarker, "Tracing context successfully preserved using {}", captureMethod);
+    } else {
+      log.warn(
+          finalMarker,
+          "Failed to preserve tracing context for {} using {}",
+          requestUri,
+          captureMethod);
+    }
+  }
+
+  /**
+   * Log fallback correlation when tracing context is unavailable
+   *
+   * @param correlationId the fallback correlation ID used
+   * @param reason the reason why tracing context was unavailable
+   */
+  public void logFallbackCorrelation(String correlationId, String reason) {
+    var marker =
+        Markers.append("eventType", "fallback_correlation")
+            .and(Markers.append("timestamp", Instant.now().toString()))
+            .and(Markers.append("category", "fallback"))
+            .and(Markers.append("correlationId", correlationId))
+            .and(Markers.append("reason", reason))
+            .and(Markers.append("tracingContextMissing", true));
+
+    log.warn(marker, "Using fallback correlation ID {} due to: {}", correlationId, reason);
   }
 
   /** Log with structured arguments for better Elasticsearch indexing */

@@ -1,6 +1,7 @@
 package com.accountselling.platform.filter;
 
 import com.accountselling.platform.service.LoggingService;
+import com.accountselling.platform.util.TracingContextCapture;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,11 +9,22 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-/** Simple filter to log HTTP request and response bodies for debugging. */
+/**
+ * Enhanced HTTP request/response logging filter with proper tracing context preservation. This
+ * filter addresses the critical issue where OpenTelemetry clears MDC context after request
+ * processing, causing response logs to lose tracing information.
+ *
+ * <p>Key improvements: - Uses TracingContextCapture to preserve OpenTelemetry context - Uses
+ * TracingAwareFilterChain for optimal context capture timing - Ensures consistent traceId/spanId
+ * across request and response logs - Maintains backward compatibility with existing logging
+ * functionality
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -34,92 +46,92 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
       return;
     }
 
-    // Create cacheable wrappers
+    // Create cacheable wrappers for request/response body capture
     CachedBodyHttpServletRequest wrappedRequest = new CachedBodyHttpServletRequest(httpRequest);
     CachedBodyHttpServletResponse wrappedResponse = new CachedBodyHttpServletResponse(httpResponse);
 
-    // Use existing requestId from RequestContextInterceptor or generate new one
-    String correlationId = org.slf4j.MDC.get("request.id");
-    if (correlationId == null) {
-      correlationId = java.util.UUID.randomUUID().toString();
-      org.slf4j.MDC.put("request.id", correlationId);
-    }
-
-    // Set requestId in MDC for consistency
-    org.slf4j.MDC.put("requestId", correlationId);
+    // Generate or use existing correlation ID
+    String correlationId = getOrGenerateCorrelationId();
     httpResponse.setHeader("X-Correlation-ID", correlationId);
 
+    // Record start time for duration calculation
     long startTime = System.currentTimeMillis();
 
-    // Log request immediately when it comes in
+    // Log incoming request immediately
     logRequest(wrappedRequest, correlationId);
 
-    // Capture traceId before processing (might be set by OpenTelemetry later)
-    String initialTraceId = org.slf4j.MDC.get("traceId");
+    // AtomicReference to hold captured tracing context
+    AtomicReference<TracingContextCapture> capturedContext = new AtomicReference<>();
 
-    // Variable to capture traceId during processing
-    final String[] capturedTraceId = new String[1];
+    // Create ResponseTracingWrapper to capture context when response is committed
+    // This is more reliable than capturing after chain completion
+    ResponseTracingWrapper tracingResponseWrapper =
+        new ResponseTracingWrapper(wrappedResponse, capturedContext::set);
 
-    // Create a custom FilterChain wrapper to capture traceId during processing
-    FilterChain traceCapturingChain =
-        new FilterChain() {
-          @Override
-          public void doFilter(ServletRequest request, ServletResponse response)
-              throws IOException, ServletException {
-            // Call the original chain
-            chain.doFilter(request, response);
-
-            // Capture traceId immediately after the chain completes (before any cleanup)
-            String traceId = org.slf4j.MDC.get("traceId");
-            if (traceId != null) {
-              capturedTraceId[0] = traceId;
-            }
-          }
-        };
+    // Create TracingAwareFilterChain as backup mechanism
+    TracingAwareFilterChain tracingChain =
+        new TracingAwareFilterChain(
+            chain,
+            context -> {
+              // Only set if ResponseTracingWrapper hasn't captured yet
+              if (capturedContext.get() == null) {
+                capturedContext.set(context);
+              }
+            });
 
     try {
-      // Process the request with our custom chain
-      traceCapturingChain.doFilter(wrappedRequest, wrappedResponse);
+      // Process request through the tracing-aware chain with response wrapper
+      // ResponseTracingWrapper will capture context when response is committed
+      // TracingAwareFilterChain serves as backup
+      tracingChain.doFilter(wrappedRequest, tracingResponseWrapper);
 
     } finally {
+      // Calculate request duration
       long duration = System.currentTimeMillis() - startTime;
 
-      // Get current traceId from MDC (might have been cleared by OpenTelemetry)
-      String currentTraceId = org.slf4j.MDC.get("traceId");
-      String savedTraceId = capturedTraceId[0];
+      // Get the captured tracing context
+      TracingContextCapture context = capturedContext.get();
 
-      // Restore all context in MDC before logging response
-      org.slf4j.MDC.put("requestId", correlationId);
-      org.slf4j.MDC.put("request.id", correlationId);
+      if (context != null) {
+        // Restore the captured tracing context to MDC
+        context.restore();
 
-      // Use the best available traceId
-      String traceIdToUse = null;
-      if (currentTraceId != null) {
-        traceIdToUse = currentTraceId;
-      } else if (savedTraceId != null) {
-        traceIdToUse = savedTraceId;
-      } else if (initialTraceId != null) {
-        traceIdToUse = initialTraceId;
+        // Log metrics about successful context preservation
+        String captureMethod =
+            tracingResponseWrapper.isContextCaptured()
+                ? "ResponseTracingWrapper"
+                : "TracingAwareFilterChain";
+        loggingService.logContextPreservationMetrics(
+            context.hasValidContext(), captureMethod, httpRequest.getRequestURI());
+      } else {
+        // Log fallback correlation
+        loggingService.logFallbackCorrelation(
+            correlationId, "No tracing context captured by either mechanism");
+
+        // Fallback: at least set the correlation ID
+        org.slf4j.MDC.put("requestId", correlationId);
+        org.slf4j.MDC.put("request.id", correlationId);
       }
 
-      if (traceIdToUse != null) {
-        org.slf4j.MDC.put("traceId", traceIdToUse);
+      try {
+        // Log response with restored tracing context
+        logResponse(wrappedRequest, wrappedResponse, duration, correlationId);
+
+      } finally {
+        // Write cached response body to actual response
+        writeResponseBody(wrappedResponse, httpResponse);
+
+        // Clean up MDC context to prevent leakage
+        if (context != null) {
+          context.cleanup();
+        } else {
+          org.slf4j.MDC.clear();
+        }
       }
-
-      // Log response when it goes out
-      logResponse(wrappedRequest, wrappedResponse, duration, correlationId);
-
-      // Write cached response to original response
-      byte[] responseBody = wrappedResponse.getBodyBytes();
-      if (responseBody.length > 0) {
-        httpResponse.getOutputStream().write(responseBody);
-      }
-
-      // Clear MDC after logging response
-      org.slf4j.MDC.clear();
     }
   }
 
+  /** Determines if the request should be logged based on URI patterns */
   private boolean shouldLog(HttpServletRequest request) {
     String uri = request.getRequestURI();
 
@@ -132,6 +144,27 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
     return false;
   }
 
+  /** Gets existing correlation ID from MDC or generates a new one */
+  private String getOrGenerateCorrelationId() {
+    // Try to get existing requestId from RequestContextInterceptor
+    String correlationId = org.slf4j.MDC.get("request.id");
+    if (correlationId == null) {
+      correlationId = org.slf4j.MDC.get("requestId");
+    }
+
+    // Generate new correlation ID if none exists
+    if (correlationId == null) {
+      correlationId = UUID.randomUUID().toString();
+    }
+
+    // Ensure correlation ID is in MDC
+    org.slf4j.MDC.put("requestId", correlationId);
+    org.slf4j.MDC.put("request.id", correlationId);
+
+    return correlationId;
+  }
+
+  /** Logs incoming HTTP request with structured data */
   private void logRequest(CachedBodyHttpServletRequest request, String correlationId) {
     try {
       String method = request.getMethod();
@@ -139,7 +172,7 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
       String queryString = request.getQueryString();
       String requestBody = request.getBody();
 
-      // Prepare request log data
+      // Prepare structured log data
       Map<String, Object> logData = new HashMap<>();
       logData.put("method", method);
       logData.put("uri", uri);
@@ -150,7 +183,7 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
       logData.put("correlationId", correlationId);
       logData.put("phase", "request");
 
-      // Add request body if present
+      // Add request body if present (with sensitive data masking)
       if (requestBody != null && !requestBody.trim().isEmpty()) {
         if (isSensitiveEndpoint(uri)) {
           logData.put("requestBody", maskSensitiveData(requestBody));
@@ -159,10 +192,11 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
         }
       }
 
-      // Log request
+      // Log structured request event (tracing context may not be available yet)
       loggingService.logSystemEvent(
           "http_request_received", String.format("HTTP Request: %s %s", method, uri), logData);
 
+      // Additional console logging for debugging
       log.info("=== REQUEST RECEIVED ===");
       log.info("Method: {}, URI: {}, CorrelationId: {}", method, uri, correlationId);
       log.info("Request Body: {}", requestBody);
@@ -173,6 +207,7 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
     }
   }
 
+  /** Logs outgoing HTTP response with structured data and preserved tracing context */
   private void logResponse(
       CachedBodyHttpServletRequest request,
       CachedBodyHttpServletResponse response,
@@ -184,7 +219,7 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
       int statusCode = response.getStatus();
       String responseBody = response.getBody();
 
-      // Prepare response log data
+      // Prepare structured log data
       Map<String, Object> logData = new HashMap<>();
       logData.put("method", method);
       logData.put("uri", uri);
@@ -194,7 +229,7 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
       logData.put("correlationId", correlationId);
       logData.put("phase", "response");
 
-      // Add response body if present and not too large
+      // Add response body if present and not too large (with sensitive data masking)
       if (responseBody != null && !responseBody.trim().isEmpty() && responseBody.length() < 10000) {
         if (isSensitiveEndpoint(uri)) {
           logData.put("responseBody", maskSensitiveResponseData(responseBody));
@@ -203,12 +238,18 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
         }
       }
 
-      // Log response
+      // Validate tracing context before logging
+      if (!loggingService.hasTracingContext()) {
+        log.warn("Response logging without tracing context for {} {}", method, uri);
+      }
+
+      // Log structured response event (this should now have tracing context)
       loggingService.logSystemEvent(
           "http_response_sent",
           String.format("HTTP Response: %s %s - %d (%dms)", method, uri, statusCode, duration),
           logData);
 
+      // Additional console logging for debugging
       log.info("=== RESPONSE SENT ===");
       log.info(
           "Method: {}, URI: {}, Status: {}, Duration: {}ms, CorrelationId: {}",
@@ -225,6 +266,22 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
     }
   }
 
+  /** Writes cached response body to the actual HTTP response */
+  private void writeResponseBody(
+      CachedBodyHttpServletResponse wrappedResponse, HttpServletResponse httpResponse)
+      throws IOException {
+    try {
+      byte[] responseBody = wrappedResponse.getBodyBytes();
+      if (responseBody.length > 0) {
+        httpResponse.getOutputStream().write(responseBody);
+      }
+    } catch (Exception e) {
+      log.error("Error writing response body", e);
+      throw e;
+    }
+  }
+
+  /** Checks if the endpoint handles sensitive data that should be masked in logs */
   private boolean isSensitiveEndpoint(String uri) {
     return uri.contains("/auth/")
         || uri.contains("/login")
@@ -232,9 +289,10 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
         || uri.contains("/token");
   }
 
+  /** Masks sensitive data in request body for security */
   private String maskSensitiveData(String requestBody) {
     try {
-      // Parse JSON and mask sensitive fields
+      @SuppressWarnings("unchecked")
       Map<String, Object> jsonMap = objectMapper.readValue(requestBody, Map.class);
 
       // Mask common sensitive fields
@@ -257,9 +315,10 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
     }
   }
 
+  /** Masks sensitive data in response body for security */
   private String maskSensitiveResponseData(String responseBody) {
     try {
-      // Parse JSON and mask sensitive fields in response
+      @SuppressWarnings("unchecked")
       Map<String, Object> jsonMap = objectMapper.readValue(responseBody, Map.class);
 
       // Mask tokens and sensitive data in response
@@ -282,11 +341,7 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
     }
   }
 
-  private String getCurrentUserId(HttpServletRequest request) {
-    // Try to get user from security context or session
-    return "anonymous"; // Default value
-  }
-
+  /** Extracts client IP address from request headers */
   private String getClientIpAddress(HttpServletRequest request) {
     String xForwardedFor = request.getHeader("X-Forwarded-For");
     if (xForwardedFor != null

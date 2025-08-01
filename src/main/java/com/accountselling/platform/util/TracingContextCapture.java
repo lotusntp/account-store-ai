@@ -60,18 +60,33 @@ public class TracingContextCapture {
         traceId = spanContext.getTraceId();
         spanId = spanContext.getSpanId();
         hasValidContext = true;
-        log.debug("Captured OpenTelemetry context - traceId: {}, spanId: {}", traceId, spanId);
-      } else {
-        log.debug("No valid OpenTelemetry span context found");
+        // OpenTelemetry context captured successfully
       }
 
       // Fallback to MDC if OpenTelemetry context is not available
       if (!hasValidContext) {
+        // Try common OpenTelemetry MDC keys
         traceId = MDC.get("traceId");
         spanId = MDC.get("spanId");
+
+        // Also try alternative MDC keys that OpenTelemetry might use
+        if (traceId == null) {
+          traceId = MDC.get("trace_id");
+        }
+        if (spanId == null) {
+          spanId = MDC.get("span_id");
+        }
+
+        // Try X-Trace-Id and X-Span-Id headers stored in MDC
+        if (traceId == null) {
+          traceId = MDC.get("X-Trace-Id");
+        }
+        if (spanId == null) {
+          spanId = MDC.get("X-Span-Id");
+        }
+
         if (traceId != null) {
           hasValidContext = true;
-          log.debug("Captured tracing context from MDC - traceId: {}, spanId: {}", traceId, spanId);
         }
       }
 
@@ -82,27 +97,48 @@ public class TracingContextCapture {
       }
       if (requestId == null) {
         requestId = UUID.randomUUID().toString();
-        log.debug("Generated new requestId: {}", requestId);
       }
 
       // Capture current MDC state
       Map<String, String> mdcSnapshot = MDC.getCopyOfContextMap();
 
-      TracingContextCapture capture =
-          new TracingContextCapture(traceId, spanId, requestId, mdcSnapshot, hasValidContext);
-
-      log.debug(
-          "TracingContextCapture created - hasValidContext: {}, timestamp: {}",
-          hasValidContext,
-          capture.captureTimestamp);
-
-      return capture;
+      return new TracingContextCapture(traceId, spanId, requestId, mdcSnapshot, hasValidContext);
 
     } catch (Exception e) {
-      log.warn("Failed to capture tracing context", e);
-      // Return a fallback context with just a correlation ID
-      String fallbackRequestId = UUID.randomUUID().toString();
-      return new TracingContextCapture(null, null, fallbackRequestId, new HashMap<>(), false);
+      log.warn("Failed to capture tracing context: {}", e.getMessage());
+      log.debug("Full exception details for tracing context capture failure", e);
+
+      // Attempt to create a minimal fallback context
+      try {
+        String fallbackRequestId = UUID.randomUUID().toString();
+        Map<String, String> fallbackMdc = new HashMap<>();
+
+        // Try to preserve at least the request ID if available
+        String existingRequestId = null;
+        try {
+          existingRequestId = MDC.get("request.id");
+          if (existingRequestId == null) {
+            existingRequestId = MDC.get("requestId");
+          }
+        } catch (Exception mdcException) {
+          log.debug("Failed to get existing request ID from MDC", mdcException);
+        }
+
+        if (existingRequestId != null) {
+          fallbackRequestId = existingRequestId;
+          fallbackMdc.put("requestId", existingRequestId);
+          fallbackMdc.put("request.id", existingRequestId);
+        }
+
+        return new TracingContextCapture(null, null, fallbackRequestId, fallbackMdc, false);
+
+      } catch (Exception fallbackException) {
+        log.error(
+            "Critical failure: Unable to create even fallback tracing context", fallbackException);
+        // Last resort: return minimal context
+        return new TracingContextCapture(
+            null, null, "emergency-" + System.currentTimeMillis(), new HashMap<>(), false);
+      }
     }
   }
 
@@ -132,11 +168,7 @@ public class TracingContextCapture {
         MDC.put("request.id", requestId);
       }
 
-      log.debug(
-          "Restored tracing context - traceId: {}, spanId: {}, requestId: {}",
-          traceId,
-          spanId,
-          requestId);
+      // Tracing context restored successfully
 
     } catch (Exception e) {
       log.error("Failed to restore tracing context", e);
@@ -159,7 +191,6 @@ public class TracingContextCapture {
   public void cleanup() {
     try {
       MDC.clear();
-      log.debug("Cleaned up MDC context");
     } catch (Exception e) {
       log.error("Failed to cleanup MDC context", e);
     }
