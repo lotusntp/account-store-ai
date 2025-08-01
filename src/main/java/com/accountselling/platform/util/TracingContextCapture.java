@@ -40,6 +40,19 @@ public class TracingContextCapture {
   }
 
   /**
+   * Creates an emergency TracingContextCapture for fallback scenarios This is used when
+   * TracingContextCapture.capture() is not accessible
+   */
+  public static TracingContextCapture createEmergency(
+      String traceId,
+      String spanId,
+      String requestId,
+      Map<String, String> mdcSnapshot,
+      boolean hasValidContext) {
+    return new TracingContextCapture(traceId, spanId, requestId, mdcSnapshot, hasValidContext);
+  }
+
+  /**
    * Captures the current tracing context from OpenTelemetry and MDC. This method should be called
    * immediately after request processing completes but before OpenTelemetry clears the context.
    *
@@ -105,10 +118,12 @@ public class TracingContextCapture {
       return new TracingContextCapture(traceId, spanId, requestId, mdcSnapshot, hasValidContext);
 
     } catch (Exception e) {
-      log.warn("Failed to capture tracing context: {}", e.getMessage());
+      log.warn(
+          "Failed to capture tracing context, attempting graceful degradation: {}", e.getMessage());
       log.debug("Full exception details for tracing context capture failure", e);
 
-      // Attempt to create a minimal fallback context
+      // Graceful degradation: Attempt to create a minimal fallback context
+      // This ensures the application never breaks due to tracing context failures
       try {
         String fallbackRequestId = UUID.randomUUID().toString();
         Map<String, String> fallbackMdc = new HashMap<>();
@@ -121,7 +136,9 @@ public class TracingContextCapture {
             existingRequestId = MDC.get("requestId");
           }
         } catch (Exception mdcException) {
-          log.debug("Failed to get existing request ID from MDC", mdcException);
+          log.debug(
+              "Failed to get existing request ID from MDC during graceful degradation",
+              mdcException);
         }
 
         if (existingRequestId != null) {
@@ -130,14 +147,31 @@ public class TracingContextCapture {
           fallbackMdc.put("request.id", existingRequestId);
         }
 
+        // Add fallback markers to indicate degraded mode
+        fallbackMdc.put("tracingDegraded", "true");
+        fallbackMdc.put("degradationReason", "context_capture_failure");
+
+        log.info(
+            "Successfully created fallback tracing context with correlation ID: {}",
+            fallbackRequestId);
         return new TracingContextCapture(null, null, fallbackRequestId, fallbackMdc, false);
 
       } catch (Exception fallbackException) {
         log.error(
-            "Critical failure: Unable to create even fallback tracing context", fallbackException);
-        // Last resort: return minimal context
-        return new TracingContextCapture(
-            null, null, "emergency-" + System.currentTimeMillis(), new HashMap<>(), false);
+            "Critical failure during graceful degradation: Unable to create even fallback tracing"
+                + " context",
+            fallbackException);
+
+        // Emergency fallback: return absolute minimal context to prevent system failure
+        // This guarantees the application functionality is never compromised
+        String emergencyId = "emergency-" + System.currentTimeMillis();
+        Map<String, String> emergencyMdc = new HashMap<>();
+        emergencyMdc.put("tracingDegraded", "true");
+        emergencyMdc.put("degradationReason", "critical_fallback_failure");
+        emergencyMdc.put("emergencyMode", "true");
+
+        log.warn("Using emergency fallback context with ID: {}", emergencyId);
+        return new TracingContextCapture(null, null, emergencyId, emergencyMdc, false);
       }
     }
   }
@@ -171,14 +205,50 @@ public class TracingContextCapture {
       // Tracing context restored successfully
 
     } catch (Exception e) {
-      log.error("Failed to restore tracing context", e);
-      // At minimum, try to restore the request ID for correlation
+      log.warn(
+          "Failed to restore tracing context, attempting graceful recovery: {}", e.getMessage());
+      log.debug("Full exception details for context restoration failure", e);
+
+      // Graceful degradation: At minimum, try to restore the request ID for correlation
       if (requestId != null) {
         try {
           MDC.put("requestId", requestId);
           MDC.put("request.id", requestId);
+          MDC.put("tracingDegraded", "true");
+          MDC.put("degradationReason", "context_restoration_failure");
+          log.info("Successfully restored basic correlation context with ID: {}", requestId);
         } catch (Exception fallbackError) {
-          log.error("Failed to restore even basic correlation context", fallbackError);
+          log.error(
+              "Critical failure: Unable to restore even basic correlation context during graceful"
+                  + " degradation",
+              fallbackError);
+
+          // Emergency fallback: Create a new correlation ID to maintain some traceability
+          try {
+            String emergencyId = "emergency-restore-" + System.currentTimeMillis();
+            MDC.put("requestId", emergencyId);
+            MDC.put("request.id", emergencyId);
+            MDC.put("tracingDegraded", "true");
+            MDC.put("degradationReason", "emergency_restoration_fallback");
+            MDC.put("emergencyMode", "true");
+            log.warn("Using emergency correlation ID for traceability: {}", emergencyId);
+          } catch (Exception emergencyError) {
+            log.error("Absolute failure: Cannot establish any correlation context", emergencyError);
+            // At this point, we've done everything possible - let the application continue
+          }
+        }
+      } else {
+        // No requestId available, create emergency correlation
+        try {
+          String emergencyId = "emergency-no-request-" + System.currentTimeMillis();
+          MDC.put("requestId", emergencyId);
+          MDC.put("request.id", emergencyId);
+          MDC.put("tracingDegraded", "true");
+          MDC.put("degradationReason", "no_request_id_available");
+          MDC.put("emergencyMode", "true");
+          log.warn("Created emergency correlation ID due to missing requestId: {}", emergencyId);
+        } catch (Exception emergencyError) {
+          log.error("Cannot create emergency correlation ID", emergencyError);
         }
       }
     }
@@ -192,7 +262,28 @@ public class TracingContextCapture {
     try {
       MDC.clear();
     } catch (Exception e) {
-      log.error("Failed to cleanup MDC context", e);
+      log.warn(
+          "Failed to cleanup MDC context, continuing with graceful degradation: {}",
+          e.getMessage());
+      log.debug("Full exception details for MDC cleanup failure", e);
+
+      // Graceful degradation: Try alternative cleanup methods
+      try {
+        // Try to remove individual keys if full clear fails
+        MDC.remove("traceId");
+        MDC.remove("spanId");
+        MDC.remove("requestId");
+        MDC.remove("request.id");
+        MDC.remove("tracingDegraded");
+        MDC.remove("degradationReason");
+        MDC.remove("emergencyMode");
+        log.debug("Successfully performed partial MDC cleanup");
+      } catch (Exception partialCleanupError) {
+        log.error(
+            "Critical: Cannot perform any MDC cleanup, potential context leakage risk",
+            partialCleanupError);
+        // Continue execution - context leakage is less critical than application failure
+      }
     }
   }
 

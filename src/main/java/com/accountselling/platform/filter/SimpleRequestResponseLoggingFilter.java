@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -104,13 +103,35 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
         loggingService.logContextPreservationMetrics(
             context.hasValidContext(), captureMethod, httpRequest.getRequestURI());
       } else {
-        // Log fallback correlation
-        loggingService.logFallbackCorrelation(
-            correlationId, "No tracing context captured by either mechanism");
+        // Enhanced fallback logging with graceful degradation
+        try {
+          loggingService.logFallbackCorrelation(
+              correlationId, "No tracing context captured by either mechanism");
+        } catch (Exception fallbackLogException) {
+          log.warn(
+              "Failed to log fallback correlation, using basic logging: {}",
+              fallbackLogException.getMessage());
+        }
 
-        // Fallback: at least set the correlation ID
-        org.slf4j.MDC.put("requestId", correlationId);
-        org.slf4j.MDC.put("request.id", correlationId);
+        // Enhanced fallback: Use LoggingService's emergency correlation method
+        try {
+          String emergencyCorrelationId =
+              loggingService.createEmergencyCorrelationId("filter-no-context");
+          log.info(
+              "Created emergency correlation ID for request without tracing context: {}",
+              emergencyCorrelationId);
+        } catch (Exception emergencyException) {
+          // Final fallback: at least set the correlation ID manually
+          try {
+            org.slf4j.MDC.put("requestId", correlationId);
+            org.slf4j.MDC.put("request.id", correlationId);
+            org.slf4j.MDC.put("tracingDegraded", "true");
+            org.slf4j.MDC.put("degradationReason", "manual_correlation_fallback");
+            log.warn("Manually set correlation ID as final fallback: {}", correlationId);
+          } catch (Exception manualException) {
+            log.error("Critical: Cannot set any correlation context", manualException);
+          }
+        }
       }
 
       try {
@@ -144,24 +165,37 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
     return false;
   }
 
-  /** Gets existing correlation ID from MDC or generates a new one */
+  /** Gets existing correlation ID from MDC or generates a new one with graceful degradation */
   private String getOrGenerateCorrelationId() {
-    // Try to get existing requestId from RequestContextInterceptor
-    String correlationId = org.slf4j.MDC.get("request.id");
-    if (correlationId == null) {
-      correlationId = org.slf4j.MDC.get("requestId");
+    try {
+      // Use LoggingService's robust method for ensuring correlation ID
+      return loggingService.ensureCorrelationId();
+    } catch (Exception e) {
+      log.warn(
+          "Failed to ensure correlation ID through LoggingService, using emergency fallback: {}",
+          e.getMessage());
+
+      // Emergency fallback when even LoggingService fails
+      try {
+        String emergencyId = "filter-emergency-" + System.currentTimeMillis();
+        org.slf4j.MDC.put("requestId", emergencyId);
+        org.slf4j.MDC.put("request.id", emergencyId);
+        org.slf4j.MDC.put("tracingDegraded", "true");
+        org.slf4j.MDC.put("degradationReason", "filter_correlation_fallback");
+        org.slf4j.MDC.put("emergencyMode", "true");
+
+        log.warn("Created emergency correlation ID in filter: {}", emergencyId);
+        return emergencyId;
+      } catch (Exception emergencyException) {
+        // Absolute last resort
+        String absoluteEmergencyId =
+            "absolute-emergency-" + Math.abs(emergencyException.hashCode());
+        log.error(
+            "Critical: Cannot create any correlation ID, using absolute emergency: {}",
+            absoluteEmergencyId);
+        return absoluteEmergencyId;
+      }
     }
-
-    // Generate new correlation ID if none exists
-    if (correlationId == null) {
-      correlationId = UUID.randomUUID().toString();
-    }
-
-    // Ensure correlation ID is in MDC
-    org.slf4j.MDC.put("requestId", correlationId);
-    org.slf4j.MDC.put("request.id", correlationId);
-
-    return correlationId;
   }
 
   /** Logs incoming HTTP request with structured data */

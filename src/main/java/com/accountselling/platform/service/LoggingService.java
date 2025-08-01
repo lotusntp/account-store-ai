@@ -229,9 +229,101 @@ public class LoggingService {
     MDC.clear();
   }
 
-  /** Generate a new correlation ID */
+  /** Generate a new correlation ID with graceful degradation */
   public String generateCorrelationId() {
-    return UUID.randomUUID().toString();
+    try {
+      return UUID.randomUUID().toString();
+    } catch (Exception e) {
+      // Fallback to timestamp-based ID if UUID fails
+      try {
+        String fallbackId =
+            "fallback-"
+                + System.currentTimeMillis()
+                + "-"
+                + Math.abs(Thread.currentThread().hashCode());
+        log.warn("UUID generation failed, using fallback correlation ID: {}", fallbackId);
+        return fallbackId;
+      } catch (Exception fallbackException) {
+        // Absolute fallback
+        String emergencyId = "emergency-" + System.nanoTime();
+        System.err.println(
+            "CRITICAL: Cannot generate any correlation ID, using emergency: " + emergencyId);
+        return emergencyId;
+      }
+    }
+  }
+
+  /**
+   * Creates an emergency correlation ID when all other methods fail This method guarantees a
+   * correlation ID is always available
+   *
+   * @param context additional context for the emergency ID generation
+   * @return emergency correlation ID that will never be null
+   */
+  public String createEmergencyCorrelationId(String context) {
+    try {
+      String emergencyId = "emergency-" + context + "-" + System.currentTimeMillis();
+
+      // Try to set it in MDC if possible
+      try {
+        MDC.put(REQUEST_ID_KEY, emergencyId);
+        MDC.put("request.id", emergencyId);
+        MDC.put("tracingDegraded", "true");
+        MDC.put("degradationReason", "emergency_correlation_creation");
+        MDC.put("emergencyMode", "true");
+
+        log.warn("Created emergency correlation ID: {} for context: {}", emergencyId, context);
+      } catch (Exception mdcException) {
+        // Even if MDC fails, return the ID
+        log.error("Cannot set emergency correlation ID in MDC: {}", mdcException.getMessage());
+      }
+
+      return emergencyId;
+    } catch (Exception e) {
+      // Absolute fallback - should never happen but just in case
+      String absoluteFallback = "absolute-fallback-" + Math.abs(e.hashCode());
+      System.err.println(
+          "CRITICAL: Emergency correlation ID creation failed, using absolute fallback: "
+              + absoluteFallback);
+      return absoluteFallback;
+    }
+  }
+
+  /**
+   * Validates and repairs correlation context in MDC Ensures there's always some form of
+   * correlation ID available
+   *
+   * @return the correlation ID that is now guaranteed to be in MDC
+   */
+  public String ensureCorrelationId() {
+    try {
+      // Check for existing correlation ID
+      String existingId = MDC.get(REQUEST_ID_KEY);
+      if (existingId == null) {
+        existingId = MDC.get("request.id");
+      }
+
+      if (existingId != null && !existingId.trim().isEmpty()) {
+        // Ensure both keys are set
+        MDC.put(REQUEST_ID_KEY, existingId);
+        MDC.put("request.id", existingId);
+        return existingId;
+      }
+
+      // No existing ID found, create new one
+      String newId = generateCorrelationId();
+      MDC.put(REQUEST_ID_KEY, newId);
+      MDC.put("request.id", newId);
+      MDC.put("correlationIdGenerated", "true");
+
+      log.debug("Generated new correlation ID: {}", newId);
+      return newId;
+
+    } catch (Exception e) {
+      // Fallback to emergency creation
+      log.warn("Failed to ensure correlation ID, creating emergency ID: {}", e.getMessage());
+      return createEmergencyCorrelationId("ensure-fallback");
+    }
   }
 
   /**
@@ -307,21 +399,42 @@ public class LoggingService {
   }
 
   /**
-   * Log fallback correlation when tracing context is unavailable
+   * Log fallback correlation when tracing context is unavailable Enhanced with graceful degradation
+   * capabilities
    *
    * @param correlationId the fallback correlation ID used
    * @param reason the reason why tracing context was unavailable
    */
   public void logFallbackCorrelation(String correlationId, String reason) {
-    var marker =
-        Markers.append("eventType", "fallback_correlation")
-            .and(Markers.append("timestamp", Instant.now().toString()))
-            .and(Markers.append("category", "fallback"))
-            .and(Markers.append("correlationId", correlationId))
-            .and(Markers.append("reason", reason))
-            .and(Markers.append("tracingContextMissing", true));
+    try {
+      var marker =
+          Markers.append("eventType", "fallback_correlation")
+              .and(Markers.append("timestamp", Instant.now().toString()))
+              .and(Markers.append("category", "fallback"))
+              .and(Markers.append("correlationId", correlationId))
+              .and(Markers.append("reason", reason))
+              .and(Markers.append("tracingContextMissing", true));
 
-    log.warn(marker, "Using fallback correlation ID {} due to: {}", correlationId, reason);
+      log.warn(marker, "Using fallback correlation ID {} due to: {}", correlationId, reason);
+    } catch (Exception e) {
+      // Graceful degradation: If even logging the fallback fails, use basic logging
+      try {
+        log.warn(
+            "Fallback correlation ID: {} (reason: {}) - structured logging failed: {}",
+            correlationId,
+            reason,
+            e.getMessage());
+      } catch (Exception basicLogException) {
+        // Last resort: system out
+        System.err.println(
+            "CRITICAL: Cannot log fallback correlation - "
+                + correlationId
+                + " - "
+                + reason
+                + " - "
+                + basicLogException.getMessage());
+      }
+    }
   }
 
   /** Log with structured arguments for better Elasticsearch indexing */
