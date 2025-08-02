@@ -1,6 +1,8 @@
 package com.accountselling.platform.filter;
 
 import com.accountselling.platform.service.LoggingService;
+import com.accountselling.platform.service.TracingHealthService;
+import com.accountselling.platform.service.TracingMetricsService;
 import com.accountselling.platform.util.TracingContextCapture;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.*;
@@ -30,6 +32,8 @@ import org.springframework.stereotype.Component;
 public class SimpleRequestResponseLoggingFilter implements Filter {
 
   private final LoggingService loggingService;
+  private final TracingMetricsService tracingMetricsService;
+  private final TracingHealthService tracingHealthService;
   private final ObjectMapper objectMapper;
 
   @Override
@@ -55,6 +59,9 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
 
     // Record start time for duration calculation
     long startTime = System.currentTimeMillis();
+
+    // Record context preservation attempt
+    tracingMetricsService.recordContextPreserved();
 
     // Log incoming request immediately
     logRequest(wrappedRequest, correlationId);
@@ -113,7 +120,34 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
                     : "TracingAwareFilterChain";
             loggingService.logContextPreservationMetrics(
                 context.hasValidContext(), captureMethod, httpRequest.getRequestURI());
+
+            // Debug logging for successful context operations
+            tracingHealthService.debugLogContextOperation(
+                "Context Restoration Success",
+                String.format(
+                    "Method: %s, URI: %s, HasValidContext: %s",
+                    captureMethod, httpRequest.getRequestURI(), context.hasValidContext()),
+                Map.of(
+                    "captureMethod",
+                    captureMethod,
+                    "traceId",
+                    context.getTraceId() != null ? context.getTraceId() : "null",
+                    "requestId",
+                    context.getRequestId(),
+                    "hasValidContext",
+                    context.hasValidContext()));
+
+            // Record metrics
+            tracingMetricsService.recordContextCapture(
+                captureMethod, true, context.hasValidContext());
+            tracingMetricsService.recordContextRestore(true);
           } catch (Exception contextRestoreException) {
+            // Critical failure logging
+            tracingHealthService.logCriticalFailure(
+                "Context Restoration",
+                "Tracing context restoration failed - system will use emergency fallback",
+                contextRestoreException);
+
             log.warn(
                 "Context restoration failed, using emergency fallback: {}",
                 contextRestoreException.getMessage());
@@ -127,6 +161,18 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
           try {
             loggingService.logFallbackCorrelation(
                 correlationId, "No tracing context captured by either mechanism");
+
+            // Debug logging for fallback scenario
+            tracingHealthService.logFallbackScenario(
+                "Context Preservation Failed",
+                "Unable to capture tracing context from both ResponseTracingWrapper and"
+                    + " TracingAwareFilterChain",
+                "Using correlation ID as fallback");
+
+            // Record fallback metrics
+            tracingMetricsService.recordFallbackCorrelation("No tracing context captured");
+            tracingMetricsService.recordContextCapture("None", false, false);
+            tracingMetricsService.recordContextRestore(false);
           } catch (Exception fallbackLogException) {
             log.warn(
                 "Failed to log fallback correlation, using basic logging: {}",
@@ -174,6 +220,12 @@ public class SimpleRequestResponseLoggingFilter implements Filter {
           if (context != null && contextRestored) {
             context.cleanup();
           }
+
+          // Record filter processing time and cleanup
+          long duration = System.currentTimeMillis() - startTime;
+          tracingMetricsService.recordFilterProcessingTime(duration);
+          tracingMetricsService.recordContextCleaned();
+
         } catch (Exception contextCleanupException) {
           log.warn(
               "Context cleanup failed, performing emergency cleanup: {}",

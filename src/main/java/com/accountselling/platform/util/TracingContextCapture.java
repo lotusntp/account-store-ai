@@ -115,7 +115,24 @@ public class TracingContextCapture {
       // Capture current MDC state
       Map<String, String> mdcSnapshot = MDC.getCopyOfContextMap();
 
-      return new TracingContextCapture(traceId, spanId, requestId, mdcSnapshot, hasValidContext);
+      TracingContextCapture capture =
+          new TracingContextCapture(traceId, spanId, requestId, mdcSnapshot, hasValidContext);
+
+      // Debug logging for context capture
+      if (log.isDebugEnabled()) {
+        log.debug(
+            "🎯 TracingContextCapture created successfully: traceId={}, spanId={}, requestId={},"
+                + " hasValidContext={}",
+            traceId,
+            spanId,
+            requestId,
+            hasValidContext);
+        if (mdcSnapshot != null && !mdcSnapshot.isEmpty()) {
+          log.debug("📋 MDC Snapshot: {}", mdcSnapshot);
+        }
+      }
+
+      return capture;
 
     } catch (Exception e) {
       log.warn(
@@ -202,7 +219,14 @@ public class TracingContextCapture {
         MDC.put("request.id", requestId);
       }
 
-      // Tracing context restored successfully
+      // Debug logging for successful restoration
+      if (log.isDebugEnabled()) {
+        log.debug(
+            "✅ TracingContext restoration successful: traceId={}, spanId={}, requestId={}",
+            traceId,
+            spanId,
+            requestId);
+      }
 
     } catch (Exception e) {
       log.warn(
